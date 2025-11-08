@@ -1,22 +1,20 @@
 """Provider service for managing evaluation providers and benchmarks."""
 
-import os
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
+
 from ..core.config import Settings
 from ..core.logging import get_logger
 from ..models.provider import (
-    Provider,
-    ProviderSummary,
-    Benchmark,
-    Collection,
-    ProvidersData,
     BenchmarkDetail,
-    ListProvidersResponse,
+    Collection,
     ListBenchmarksResponse,
     ListCollectionsResponse,
+    ListProvidersResponse,
+    Provider,
+    ProvidersData,
+    ProviderSummary,
 )
 
 logger = get_logger(__name__)
@@ -27,10 +25,10 @@ class ProviderService:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._providers_data: Optional[ProvidersData] = None
-        self._providers_by_id: Dict[str, Provider] = {}
-        self._benchmarks_by_id: Dict[str, BenchmarkDetail] = {}
-        self._collections_by_id: Dict[str, Collection] = {}
+        self._providers_data: ProvidersData | None = None
+        self._providers_by_id: dict[str, Provider] = {}
+        self._benchmarks_by_id: dict[str, BenchmarkDetail] = {}
+        self._collections_by_id: dict[str, Collection] = {}
 
     def _get_providers_file_path(self) -> Path:
         """Get the path to the providers YAML file."""
@@ -46,7 +44,9 @@ class ProviderService:
         if fallback_path.exists():
             return fallback_path
 
-        raise FileNotFoundError(f"Providers configuration file not found at {providers_file}")
+        raise FileNotFoundError(
+            f"Providers configuration file not found at {providers_file}"
+        )
 
     def _load_providers_data(self) -> ProvidersData:
         """Load providers data from YAML file."""
@@ -56,7 +56,7 @@ class ProviderService:
         try:
             providers_file = self._get_providers_file_path()
 
-            with open(providers_file, 'r', encoding='utf-8') as f:
+            with open(providers_file, encoding="utf-8") as f:
                 yaml_data = yaml.safe_load(f)
 
             self._providers_data = ProvidersData(**yaml_data)
@@ -66,7 +66,9 @@ class ProviderService:
                 "Loaded providers configuration",
                 providers_count=len(self._providers_data.providers),
                 collections_count=len(self._providers_data.collections),
-                total_benchmarks=sum(len(p.benchmarks) for p in self._providers_data.providers)
+                total_benchmarks=sum(
+                    len(p.benchmarks) for p in self._providers_data.providers
+                ),
             )
 
             return self._providers_data
@@ -105,7 +107,7 @@ class ProviderService:
                     dataset_size=benchmark.dataset_size,
                     tags=benchmark.tags,
                     provider_type=provider.provider_type.value,
-                    base_url=provider.base_url
+                    base_url=provider.base_url,
                 )
 
                 # Use composite key for uniqueness
@@ -129,19 +131,21 @@ class ProviderService:
                 description=provider.description,
                 provider_type=provider.provider_type,
                 base_url=provider.base_url,
-                benchmark_count=len(provider.benchmarks)
+                benchmark_count=len(provider.benchmarks),
             )
             provider_summaries.append(summary)
 
-        total_benchmarks = sum(len(provider.benchmarks) for provider in providers_data.providers)
+        total_benchmarks = sum(
+            len(provider.benchmarks) for provider in providers_data.providers
+        )
 
         return ListProvidersResponse(
             providers=provider_summaries,
             total_providers=len(providers_data.providers),
-            total_benchmarks=total_benchmarks
+            total_benchmarks=total_benchmarks,
         )
 
-    def get_provider_by_id(self, provider_id: str) -> Optional[Provider]:
+    def get_provider_by_id(self, provider_id: str) -> Provider | None:
         """Get a provider by ID."""
         self._load_providers_data()
         return self._providers_by_id.get(provider_id)
@@ -162,7 +166,7 @@ class ProviderService:
                 "metrics": benchmark_detail.metrics,
                 "num_few_shot": benchmark_detail.num_few_shot,
                 "dataset_size": benchmark_detail.dataset_size,
-                "tags": benchmark_detail.tags
+                "tags": benchmark_detail.tags,
             }
             benchmarks.append(benchmark_dict)
 
@@ -171,10 +175,10 @@ class ProviderService:
         return ListBenchmarksResponse(
             benchmarks=benchmarks,
             total_count=len(benchmarks),
-            providers_included=provider_ids
+            providers_included=provider_ids,
         )
 
-    def get_benchmarks_by_provider(self, provider_id: str) -> List[BenchmarkDetail]:
+    def get_benchmarks_by_provider(self, provider_id: str) -> list[BenchmarkDetail]:
         """Get all benchmarks for a specific provider."""
         self._load_providers_data()
 
@@ -185,7 +189,9 @@ class ProviderService:
 
         return benchmarks
 
-    def get_benchmark_by_id(self, provider_id: str, benchmark_id: str) -> Optional[BenchmarkDetail]:
+    def get_benchmark_by_id(
+        self, provider_id: str, benchmark_id: str
+    ) -> BenchmarkDetail | None:
         """Get a specific benchmark by provider and benchmark ID."""
         self._load_providers_data()
         composite_key = f"{provider_id}::{benchmark_id}"
@@ -197,20 +203,20 @@ class ProviderService:
 
         return ListCollectionsResponse(
             collections=providers_data.collections,
-            total_collections=len(providers_data.collections)
+            total_collections=len(providers_data.collections),
         )
 
-    def get_collection_by_id(self, collection_id: str) -> Optional[Collection]:
+    def get_collection_by_id(self, collection_id: str) -> Collection | None:
         """Get a collection by ID."""
         self._load_providers_data()
         return self._collections_by_id.get(collection_id)
 
     def search_benchmarks(
         self,
-        category: Optional[str] = None,
-        provider_id: Optional[str] = None,
-        tags: Optional[List[str]] = None
-    ) -> List[BenchmarkDetail]:
+        category: str | None = None,
+        provider_id: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[BenchmarkDetail]:
         """Search benchmarks by various criteria."""
         self._load_providers_data()
 

@@ -1,11 +1,12 @@
 """Base executor class for evaluation backends."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
-from ..models.evaluation import EvaluationResult, BackendSpec, BenchmarkSpec
+from ..models.evaluation import BackendSpec, BenchmarkSpec, EvaluationResult
 
 
 class ExecutionContext:
@@ -20,9 +21,9 @@ class ExecutionContext:
         benchmark_spec: BenchmarkSpec,
         timeout_minutes: int,
         retry_attempts: int,
-        started_at: Optional[datetime] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        model_server_base_url: Optional[str] = None,
+        started_at: datetime | None = None,
+        metadata: dict[str, Any] | None = None,
+        model_server_base_url: str | None = None,
     ):
         self.evaluation_id = evaluation_id
         self.model_server_id = model_server_id
@@ -39,7 +40,7 @@ class ExecutionContext:
 class Executor(ABC):
     """Abstract base class for evaluation backend executors."""
 
-    def __init__(self, backend_config: Dict[str, Any]):
+    def __init__(self, backend_config: dict[str, Any]):
         """Initialize the executor with backend-specific configuration.
 
         Args:
@@ -70,7 +71,7 @@ class Executor(ABC):
     async def execute_benchmark(
         self,
         context: ExecutionContext,
-        progress_callback: Optional[Callable[[str, float, str], None]] = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Execute a benchmark evaluation.
 
@@ -98,7 +99,7 @@ class Executor(ABC):
         pass
 
     @classmethod
-    def validate_backend_config(cls, config: Dict[str, Any]) -> bool:
+    def validate_backend_config(cls, config: dict[str, Any]) -> bool:
         """Validate backend configuration without instantiating.
 
         Args:

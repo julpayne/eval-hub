@@ -2,34 +2,33 @@
 
 import asyncio
 import json
-import tempfile
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
-from uuid import UUID
+from typing import Any
 
 import httpx
 
-from .base import Executor, ExecutionContext
-from ..core.exceptions import BackendError, TimeoutError
+from ..core.exceptions import BackendError
 from ..core.logging import get_logger
 from ..models.evaluation import EvaluationResult, EvaluationStatus
 from ..models.nemo_evaluator import (
-    NemoContainerConfig,
-    NemoEvaluationRequest,
-    NemoEvaluationConfig,
-    NemoEvaluationTarget,
+    EndpointType,
     NemoApiEndpoint,
     NemoConfigParams,
+    NemoContainerConfig,
+    NemoEvaluationConfig,
+    NemoEvaluationRequest,
     NemoEvaluationResult,
-    EndpointType,
+    NemoEvaluationTarget,
 )
+from .base import ExecutionContext, Executor
 
 
 class NemoEvaluatorExecutor(Executor):
     """Executor for communicating with remote NeMo Evaluator containers."""
 
-    def __init__(self, backend_config: Dict[str, Any]):
+    def __init__(self, backend_config: dict[str, Any]):
         self.logger = get_logger(__name__)
         super().__init__(backend_config)
 
@@ -41,7 +40,7 @@ class NemoEvaluatorExecutor(Executor):
             max_retries=backend_config.get("max_retries", 3),
             health_check_endpoint=backend_config.get("health_check_endpoint"),
             auth_token=backend_config.get("auth_token"),
-            verify_ssl=backend_config.get("verify_ssl", True)
+            verify_ssl=backend_config.get("verify_ssl", True),
         )
 
         self.base_url = self.container_config.get_full_endpoint()
@@ -52,7 +51,9 @@ class NemoEvaluatorExecutor(Executor):
 
         for field in required_fields:
             if field not in self.backend_config:
-                raise ValueError(f"NeMo Evaluator configuration missing required field: {field}")
+                raise ValueError(
+                    f"NeMo Evaluator configuration missing required field: {field}"
+                )
 
         # Additional validation
         endpoint = self.backend_config.get("endpoint")
@@ -73,14 +74,13 @@ class NemoEvaluatorExecutor(Executor):
                 health_url = f"{self.base_url}/"
 
             async with httpx.AsyncClient(
-                timeout=10.0,
-                verify=self.container_config.verify_ssl
+                timeout=10.0, verify=self.container_config.verify_ssl
             ) as client:
                 # NeMo Evaluator server expects POST requests
                 response = await client.post(
                     health_url,
                     json={"ping": "health_check"},
-                    headers=self._get_headers()
+                    headers=self._get_headers(),
                 )
 
                 # If we get any response (even an error), the container is responding
@@ -90,14 +90,14 @@ class NemoEvaluatorExecutor(Executor):
             self.logger.warning(
                 "Health check failed for NeMo Evaluator container",
                 endpoint=self.base_url,
-                error=str(e)
+                error=str(e),
             )
             return False
 
     async def execute_benchmark(
         self,
         context: ExecutionContext,
-        progress_callback: Optional[Callable[[str, float, str], None]] = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Execute a benchmark evaluation on the remote NeMo Evaluator container."""
 
@@ -105,7 +105,7 @@ class NemoEvaluatorExecutor(Executor):
             "Starting NeMo Evaluator execution",
             evaluation_id=str(context.evaluation_id),
             endpoint=self.base_url,
-            benchmark=context.benchmark_spec.name
+            benchmark=context.benchmark_spec.name,
         )
 
         try:
@@ -114,7 +114,7 @@ class NemoEvaluatorExecutor(Executor):
                 progress_callback(
                     str(context.evaluation_id),
                     0.0,
-                    f"Preparing {context.benchmark_spec.name} for NeMo Evaluator"
+                    f"Preparing {context.benchmark_spec.name} for NeMo Evaluator",
                 )
 
             # Prepare the evaluation request
@@ -125,30 +125,30 @@ class NemoEvaluatorExecutor(Executor):
                 progress_callback(
                     str(context.evaluation_id),
                     10.0,
-                    f"Sending {context.benchmark_spec.name} to NeMo Evaluator"
+                    f"Sending {context.benchmark_spec.name} to NeMo Evaluator",
                 )
 
             # Execute with retries
-            result = await self._execute_with_retries(nemo_request, progress_callback, context)
+            result = await self._execute_with_retries(
+                nemo_request, progress_callback, context
+            )
 
             # Report completion
             if progress_callback:
                 progress_callback(
                     str(context.evaluation_id),
                     100.0,
-                    f"Completed {context.benchmark_spec.name} on NeMo Evaluator"
+                    f"Completed {context.benchmark_spec.name} on NeMo Evaluator",
                 )
 
             # Convert NeMo result to eval-hub format
-            eval_result = await self._convert_nemo_result_to_eval_hub(
-                result, context
-            )
+            eval_result = await self._convert_nemo_result_to_eval_hub(result, context)
 
             self.logger.info(
                 "NeMo Evaluator execution completed",
                 evaluation_id=str(context.evaluation_id),
                 benchmark=context.benchmark_spec.name,
-                status=eval_result.status
+                status=eval_result.status,
             )
 
             return eval_result
@@ -158,7 +158,7 @@ class NemoEvaluatorExecutor(Executor):
                 "NeMo Evaluator execution failed",
                 evaluation_id=str(context.evaluation_id),
                 benchmark=context.benchmark_spec.name,
-                error=str(e)
+                error=str(e),
             )
 
             return EvaluationResult(
@@ -169,7 +169,9 @@ class NemoEvaluatorExecutor(Executor):
                 error_message=str(e),
                 started_at=context.started_at,
                 completed_at=datetime.utcnow(),
-                duration_seconds=(datetime.utcnow() - context.started_at).total_seconds(),
+                duration_seconds=(
+                    datetime.utcnow() - context.started_at
+                ).total_seconds(),
             )
 
     async def cleanup(self) -> None:
@@ -180,23 +182,26 @@ class NemoEvaluatorExecutor(Executor):
                 await self._run_post_eval_hooks()
             except Exception as e:
                 self.logger.warning(
-                    "Failed to run post-evaluation hooks during cleanup",
-                    error=str(e)
+                    "Failed to run post-evaluation hooks during cleanup", error=str(e)
                 )
 
-    async def _build_nemo_evaluation_request(self, context: ExecutionContext) -> NemoEvaluationRequest:
+    async def _build_nemo_evaluation_request(
+        self, context: ExecutionContext
+    ) -> NemoEvaluationRequest:
         """Build a NeMo Evaluator request from eval-hub parameters."""
 
         # Create output directory
-        output_dir = f"/tmp/nemo_eval_{context.evaluation_id}_{context.benchmark_spec.name}"
+        output_dir = (
+            f"/tmp/nemo_eval_{context.evaluation_id}_{context.benchmark_spec.name}"
+        )
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # Build API endpoint configuration
         # Use model server base URL if available, otherwise fall back to config or default
         model_endpoint = (
-            context.model_server_base_url or
-            self.backend_config.get("model_endpoint") or
-            "http://localhost:8000"
+            context.model_server_base_url
+            or self.backend_config.get("model_endpoint")
+            or "http://localhost:8000"
         )
         api_endpoint = NemoApiEndpoint(
             url=model_endpoint,
@@ -207,7 +212,8 @@ class NemoEvaluatorExecutor(Executor):
 
         # Build configuration parameters
         config_params = NemoConfigParams(
-            limit_samples=self.backend_config.get("limit_samples") or context.benchmark_spec.config.get("limit"),
+            limit_samples=self.backend_config.get("limit_samples")
+            or context.benchmark_spec.config.get("limit"),
             max_new_tokens=self.backend_config.get("max_new_tokens", 512),
             max_retries=self.backend_config.get("max_retries", 3),
             parallelism=self.backend_config.get("parallelism", 1),
@@ -215,7 +221,7 @@ class NemoEvaluatorExecutor(Executor):
             temperature=self.backend_config.get("temperature", 0.0),
             request_timeout=self.backend_config.get("request_timeout", 60),
             top_p=self.backend_config.get("top_p", 0.95),
-            extra=self.backend_config.get("extra", {})
+            extra=self.backend_config.get("extra", {}),
         )
 
         # Build evaluation configuration
@@ -223,7 +229,9 @@ class NemoEvaluatorExecutor(Executor):
             output_dir=output_dir,
             params=config_params,
             type=context.benchmark_spec.name,
-            supported_endpoint_types=[api_endpoint.type.value] if api_endpoint.type else None
+            supported_endpoint_types=(
+                [api_endpoint.type.value] if api_endpoint.type else None
+            ),
         )
 
         # Build target configuration
@@ -235,7 +243,7 @@ class NemoEvaluatorExecutor(Executor):
             framework_name=self.backend_config.get("framework_name", "eval-hub"),
             pkg_name=context.benchmark_spec.name,
             config=eval_config,
-            target=target_config
+            target=target_config,
         )
 
         return nemo_request
@@ -243,8 +251,8 @@ class NemoEvaluatorExecutor(Executor):
     async def _execute_with_retries(
         self,
         nemo_request: NemoEvaluationRequest,
-        progress_callback: Optional[Callable[[str, float, str], None]],
-        context: ExecutionContext
+        progress_callback: Callable[[str, float, str], None] | None,
+        context: ExecutionContext,
     ) -> NemoEvaluationResult:
         """Execute the NeMo evaluation with retry logic."""
 
@@ -257,14 +265,16 @@ class NemoEvaluatorExecutor(Executor):
                         "Retrying NeMo Evaluator request",
                         evaluation_id=str(context.evaluation_id),
                         attempt=attempt + 1,
-                        max_attempts=self.container_config.max_retries + 1
+                        max_attempts=self.container_config.max_retries + 1,
                     )
 
                     # Exponential backoff
-                    wait_time = 2 ** attempt
+                    wait_time = 2**attempt
                     await asyncio.sleep(wait_time)
 
-                result = await self._make_evaluation_request(nemo_request, progress_callback, context)
+                result = await self._make_evaluation_request(
+                    nemo_request, progress_callback, context
+                )
                 return result
 
             except Exception as e:
@@ -273,38 +283,39 @@ class NemoEvaluatorExecutor(Executor):
                     "NeMo Evaluator request attempt failed",
                     evaluation_id=str(context.evaluation_id),
                     attempt=attempt + 1,
-                    error=str(e)
+                    error=str(e),
                 )
 
         # All retries exhausted
-        raise BackendError(f"NeMo Evaluator failed after {self.container_config.max_retries + 1} attempts: {last_error}")
+        raise BackendError(
+            f"NeMo Evaluator failed after {self.container_config.max_retries + 1} attempts: {last_error}"
+        )
 
     async def _make_evaluation_request(
         self,
         nemo_request: NemoEvaluationRequest,
-        progress_callback: Optional[Callable[[str, float, str], None]],
-        context: ExecutionContext
+        progress_callback: Callable[[str, float, str], None] | None,
+        context: ExecutionContext,
     ) -> NemoEvaluationResult:
         """Make the actual HTTP request to the NeMo Evaluator container."""
 
         async with httpx.AsyncClient(
             timeout=self.container_config.timeout_seconds,
-            verify=self.container_config.verify_ssl
+            verify=self.container_config.verify_ssl,
         ) as client:
-
             # Report progress: sending request
             if progress_callback:
                 progress_callback(
                     str(context.evaluation_id),
                     20.0,
-                    "Sending evaluation request to NeMo Evaluator"
+                    "Sending evaluation request to NeMo Evaluator",
                 )
 
             # NeMo Evaluator expects POST to any path
             response = await client.post(
                 f"{self.base_url}/evaluate",
                 json=nemo_request.model_dump(),
-                headers=self._get_headers()
+                headers=self._get_headers(),
             )
 
             # Report progress: request sent
@@ -312,11 +323,13 @@ class NemoEvaluatorExecutor(Executor):
                 progress_callback(
                     str(context.evaluation_id),
                     40.0,
-                    "NeMo Evaluator processing request"
+                    "NeMo Evaluator processing request",
                 )
 
             if response.status_code >= 400:
-                error_msg = f"NeMo Evaluator returned {response.status_code}: {response.text}"
+                error_msg = (
+                    f"NeMo Evaluator returned {response.status_code}: {response.text}"
+                )
                 raise BackendError(error_msg)
 
             # Report progress: processing response
@@ -324,7 +337,7 @@ class NemoEvaluatorExecutor(Executor):
                 progress_callback(
                     str(context.evaluation_id),
                     80.0,
-                    "Processing NeMo Evaluator response"
+                    "Processing NeMo Evaluator response",
                 )
 
             # Parse the response
@@ -336,9 +349,7 @@ class NemoEvaluatorExecutor(Executor):
                 raise BackendError(f"Failed to parse NeMo Evaluator response: {e}")
 
     async def _convert_nemo_result_to_eval_hub(
-        self,
-        nemo_result: NemoEvaluationResult,
-        context: ExecutionContext
+        self, nemo_result: NemoEvaluationResult, context: ExecutionContext
     ) -> EvaluationResult:
         """Convert NeMo Evaluator result to eval-hub EvaluationResult format."""
 
@@ -351,7 +362,11 @@ class NemoEvaluatorExecutor(Executor):
                 for metric_name, metric_result in task_result.metrics.items():
                     for score_name, score in metric_result.scores.items():
                         # Flatten the metric name
-                        full_metric_name = f"{task_name}_{metric_name}_{score_name}" if len(nemo_result.tasks) > 1 else f"{metric_name}_{score_name}"
+                        full_metric_name = (
+                            f"{task_name}_{metric_name}_{score_name}"
+                            if len(nemo_result.tasks) > 1
+                            else f"{metric_name}_{score_name}"
+                        )
                         metrics[full_metric_name] = score.value
 
                         # Also include statistics as separate metrics
@@ -370,7 +385,9 @@ class NemoEvaluatorExecutor(Executor):
                         metrics[full_metric_name] = score.value
 
         # Add some default artifacts
-        artifacts["nemo_evaluator_response"] = f"/tmp/nemo_eval_{context.evaluation_id}_{context.benchmark_spec.name}_response.json"
+        artifacts["nemo_evaluator_response"] = (
+            f"/tmp/nemo_eval_{context.evaluation_id}_{context.benchmark_spec.name}_response.json"
+        )
 
         # Save the full response for debugging
         with open(artifacts["nemo_evaluator_response"], "w") as f:
@@ -388,11 +405,11 @@ class NemoEvaluatorExecutor(Executor):
             duration_seconds=(datetime.utcnow() - context.started_at).total_seconds(),
         )
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """Get HTTP headers for requests to NeMo Evaluator."""
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "eval-hub-executor/1.0"
+            "User-Agent": "eval-hub-executor/1.0",
         }
 
         if self.container_config.auth_token:
@@ -404,20 +421,18 @@ class NemoEvaluatorExecutor(Executor):
         """Trigger post-evaluation hooks on the NeMo Evaluator container."""
         try:
             async with httpx.AsyncClient(
-                timeout=30.0,
-                verify=self.container_config.verify_ssl
+                timeout=30.0, verify=self.container_config.verify_ssl
             ) as client:
-
                 response = await client.post(
                     f"{self.base_url}/adapterserver/run-post-hook",
                     json={},
-                    headers=self._get_headers()
+                    headers=self._get_headers(),
                 )
 
                 if response.status_code == 200:
                     self.logger.info(
                         "Successfully triggered post-evaluation hooks",
-                        endpoint=self.base_url
+                        endpoint=self.base_url,
                     )
                     return True
                 else:
@@ -425,7 +440,7 @@ class NemoEvaluatorExecutor(Executor):
                         "Failed to trigger post-evaluation hooks",
                         endpoint=self.base_url,
                         status_code=response.status_code,
-                        response=response.text
+                        response=response.text,
                     )
                     return False
 
@@ -433,7 +448,7 @@ class NemoEvaluatorExecutor(Executor):
             self.logger.error(
                 "Error triggering post-evaluation hooks",
                 endpoint=self.base_url,
-                error=str(e)
+                error=str(e),
             )
             return False
 
@@ -451,11 +466,11 @@ class NemoEvaluatorExecutorFactory:
     """Factory for creating NeMo Evaluator executors."""
 
     @staticmethod
-    def create_executor(backend_config: Dict[str, Any]) -> NemoEvaluatorExecutor:
+    def create_executor(backend_config: dict[str, Any]) -> NemoEvaluatorExecutor:
         """Create a NeMo Evaluator executor from backend configuration."""
         return NemoEvaluatorExecutor(backend_config)
 
     @staticmethod
-    def validate_config(backend_config: Dict[str, Any]) -> bool:
+    def validate_config(backend_config: dict[str, Any]) -> bool:
         """Validate NeMo Evaluator backend configuration."""
         return NemoEvaluatorExecutor.validate_backend_config(backend_config)

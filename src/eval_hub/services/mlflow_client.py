@@ -1,14 +1,12 @@
 """MLFlow client service for experiment tracking and results storage."""
 
 import os
-import json
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-from uuid import UUID
+from typing import Any
 
 import mlflow
 import mlflow.tracking
-from mlflow.entities import Run, Experiment
+from mlflow.entities import Run
 from mlflow.exceptions import MlflowException
 
 from ..core.config import Settings
@@ -39,8 +37,7 @@ class MLFlowClient:
             os.environ["MLFLOW_S3_ENDPOINT_URL"] = self.settings.s3_endpoint_url
 
         self.logger.info(
-            "MLFlow client configured",
-            tracking_uri=self.settings.mlflow_tracking_uri
+            "MLFlow client configured", tracking_uri=self.settings.mlflow_tracking_uri
         )
 
     async def create_experiment(self, request: EvaluationRequest) -> str:
@@ -55,7 +52,7 @@ class MLFlowClient:
                 self.logger.info(
                     "Using existing MLFlow experiment",
                     experiment_name=experiment_name,
-                    experiment_id=experiment_id
+                    experiment_id=experiment_id,
                 )
             else:
                 # Create new experiment
@@ -67,12 +64,12 @@ class MLFlowClient:
                         "created_at": request.created_at.isoformat(),
                         "evaluation_count": str(len(request.evaluations)),
                         "service_version": self.settings.version,
-                    }
+                    },
                 )
                 self.logger.info(
                     "Created new MLFlow experiment",
                     experiment_name=experiment_name,
-                    experiment_id=experiment_id
+                    experiment_id=experiment_id,
                 )
 
             return experiment_id
@@ -85,7 +82,7 @@ class MLFlowClient:
         experiment_id: str,
         evaluation: EvaluationSpec,
         backend_name: str,
-        benchmark_name: str
+        benchmark_name: str,
     ) -> str:
         """Start an MLFlow run for a specific evaluation."""
         run_name = f"{evaluation.model_server_id}::{evaluation.model_name}_{backend_name}_{benchmark_name}"
@@ -101,20 +98,26 @@ class MLFlowClient:
                     "model_name": evaluation.model_name,
                     "backend_name": backend_name,
                     "benchmark_name": benchmark_name,
-                    "risk_category": evaluation.risk_category.value if evaluation.risk_category else None,
+                    "risk_category": (
+                        evaluation.risk_category.value
+                        if evaluation.risk_category
+                        else None
+                    ),
                     "priority": str(evaluation.priority),
                     "started_at": datetime.utcnow().isoformat(),
-                }
+                },
             )
 
             # Log evaluation parameters
-            await self._log_evaluation_parameters(evaluation, backend_name, benchmark_name)
+            await self._log_evaluation_parameters(
+                evaluation, backend_name, benchmark_name
+            )
 
             self.logger.info(
                 "Started MLFlow run",
                 run_id=run.info.run_id,
                 run_name=run_name,
-                evaluation_id=str(evaluation.id)
+                evaluation_id=str(evaluation.id),
             )
 
             return run.info.run_id
@@ -123,10 +126,7 @@ class MLFlowClient:
             raise MLFlowError(f"Failed to start MLFlow run: {e}")
 
     async def _log_evaluation_parameters(
-        self,
-        evaluation: EvaluationSpec,
-        backend_name: str,
-        benchmark_name: str
+        self, evaluation: EvaluationSpec, backend_name: str, benchmark_name: str
     ) -> None:
         """Log evaluation parameters to the current MLFlow run."""
         try:
@@ -155,7 +155,8 @@ class MLFlowClient:
 
                 # Log benchmark-specific configuration
                 benchmark_spec = next(
-                    (b for b in backend_spec.benchmarks if b.name == benchmark_name), None
+                    (b for b in backend_spec.benchmarks if b.name == benchmark_name),
+                    None,
                 )
                 if benchmark_spec:
                     if benchmark_spec.num_fewshot is not None:
@@ -177,8 +178,7 @@ class MLFlowClient:
 
         except MlflowException as e:
             self.logger.warning(
-                "Failed to log evaluation parameters to MLFlow",
-                error=str(e)
+                "Failed to log evaluation parameters to MLFlow", error=str(e)
             )
 
     async def log_evaluation_result(self, result: EvaluationResult) -> None:
@@ -186,7 +186,7 @@ class MLFlowClient:
         if not result.mlflow_run_id:
             self.logger.warning(
                 "No MLFlow run ID found for result",
-                evaluation_id=str(result.evaluation_id)
+                evaluation_id=str(result.evaluation_id),
             )
             return
 
@@ -230,24 +230,28 @@ class MLFlowClient:
                             "Failed to log artifact",
                             artifact_name=artifact_name,
                             artifact_path=artifact_path,
-                            error=str(e)
+                            error=str(e),
                         )
 
                 # End the run
-                mlflow.end_run(status="FINISHED" if result.status.value == "completed" else "FAILED")
+                mlflow.end_run(
+                    status=(
+                        "FINISHED" if result.status.value == "completed" else "FAILED"
+                    )
+                )
 
                 self.logger.info(
                     "Logged evaluation result to MLFlow",
                     run_id=result.mlflow_run_id,
                     evaluation_id=str(result.evaluation_id),
-                    status=result.status.value
+                    status=result.status.value,
                 )
 
         except MlflowException as e:
             self.logger.error(
                 "Failed to log evaluation result to MLFlow",
                 run_id=result.mlflow_run_id,
-                error=str(e)
+                error=str(e),
             )
 
     async def get_experiment_url(self, experiment_id: str) -> str:
@@ -263,22 +267,22 @@ class MLFlowClient:
     async def search_runs(
         self,
         experiment_id: str,
-        filter_string: Optional[str] = None,
-        max_results: int = 100
-    ) -> List[Run]:
+        filter_string: str | None = None,
+        max_results: int = 100,
+    ) -> list[Run]:
         """Search for runs in an experiment."""
         try:
             runs = mlflow.search_runs(
                 experiment_ids=[experiment_id],
                 filter_string=filter_string,
                 max_results=max_results,
-                output_format="list"
+                output_format="list",
             )
             return runs
         except MlflowException as e:
             raise MLFlowError(f"Failed to search runs: {e}")
 
-    async def get_run_metrics(self, run_id: str) -> Dict[str, float]:
+    async def get_run_metrics(self, run_id: str) -> dict[str, float]:
         """Get metrics for a specific run."""
         try:
             client = mlflow.tracking.MlflowClient()
@@ -291,10 +295,7 @@ class MLFlowClient:
         """Delete an experiment."""
         try:
             mlflow.delete_experiment(experiment_id)
-            self.logger.info(
-                "Deleted MLFlow experiment",
-                experiment_id=experiment_id
-            )
+            self.logger.info("Deleted MLFlow experiment", experiment_id=experiment_id)
         except MlflowException as e:
             raise MLFlowError(f"Failed to delete experiment: {e}")
 
@@ -305,7 +306,12 @@ class MLFlowClient:
         else:
             # Generate name based on timestamp and request content
             timestamp = request.created_at.strftime("%Y%m%d_%H%M%S")
-            model_identifiers = list(set(f"{eval.model_server_id}::{eval.model_name}" for eval in request.evaluations))
+            model_identifiers = list(
+                set(
+                    f"{eval.model_server_id}::{eval.model_name}"
+                    for eval in request.evaluations
+                )
+            )
             if len(model_identifiers) == 1:
                 base_name = f"{model_identifiers[0]}_{timestamp}"
             else:
@@ -314,7 +320,7 @@ class MLFlowClient:
         # Add prefix
         return f"{self.settings.mlflow_experiment_prefix}_{base_name}"
 
-    async def aggregate_experiment_metrics(self, experiment_id: str) -> Dict[str, Any]:
+    async def aggregate_experiment_metrics(self, experiment_id: str) -> dict[str, Any]:
         """Aggregate metrics across all runs in an experiment."""
         try:
             runs = await self.search_runs(experiment_id)
@@ -346,6 +352,6 @@ class MLFlowClient:
             self.logger.error(
                 "Failed to aggregate experiment metrics",
                 experiment_id=experiment_id,
-                error=str(e)
+                error=str(e),
             )
             return {}

@@ -1,22 +1,24 @@
 """Factory for creating backend executors."""
 
-from typing import Any, Dict, Type
+from typing import Any
 
-from .base import Executor
-from .nemo_evaluator import NemoEvaluatorExecutor
 from ..core.exceptions import BackendError
 from ..models.evaluation import BackendType
+from .base import Executor
+from .nemo_evaluator import NemoEvaluatorExecutor
 
 
 class ExecutorFactory:
     """Factory for creating backend executors based on configuration."""
 
-    _EXECUTOR_REGISTRY: Dict[str, Type[Executor]] = {
+    _EXECUTOR_REGISTRY: dict[str, type[Executor]] = {
         BackendType.NEMO_EVALUATOR.value: NemoEvaluatorExecutor,
     }
 
     @classmethod
-    def register_executor(cls, backend_type: str, executor_class: Type[Executor]) -> None:
+    def register_executor(
+        cls, backend_type: str, executor_class: type[Executor]
+    ) -> None:
         """Register a new executor class for a backend type.
 
         Args:
@@ -26,7 +28,9 @@ class ExecutorFactory:
         cls._EXECUTOR_REGISTRY[backend_type] = executor_class
 
     @classmethod
-    def create_executor(cls, backend_type: str, backend_config: Dict[str, Any]) -> Executor:
+    def create_executor(
+        cls, backend_type: str, backend_config: dict[str, Any]
+    ) -> Executor:
         """Create an executor instance for the specified backend type.
 
         Args:
@@ -50,7 +54,9 @@ class ExecutorFactory:
             raise BackendError(f"Failed to create {backend_type} executor: {e}")
 
     @classmethod
-    def validate_backend_config(cls, backend_type: str, backend_config: Dict[str, Any]) -> bool:
+    def validate_backend_config(
+        cls, backend_type: str, backend_config: dict[str, Any]
+    ) -> bool:
         """Validate configuration for a specific backend type.
 
         Args:
@@ -92,7 +98,7 @@ class ExecutorFactory:
 
 
 # Convenience function for creating executors
-def create_executor(backend_type: str, backend_config: Dict[str, Any]) -> Executor:
+def create_executor(backend_type: str, backend_config: dict[str, Any]) -> Executor:
     """Convenience function to create an executor.
 
     Args:

@@ -1,27 +1,27 @@
 """Data models for the evaluation service."""
 
 from .evaluation import (
+    BackendSpec,
+    BenchmarkSpec,
     EvaluationRequest,
     EvaluationResponse,
-    EvaluationSpec,
     EvaluationResult,
-    BackendSpec,
+    EvaluationSpec,
     RiskCategory,
-    BenchmarkSpec,
 )
 from .health import HealthResponse
 from .model import (
+    ListModelsResponse,
     Model,
-    ModelType,
-    ModelStatus,
     ModelCapabilities,
     ModelConfig,
-    ModelSummary,
     ModelRegistrationRequest,
-    ModelUpdateRequest,
-    ListModelsResponse,
-    RuntimeModelConfig,
     ModelsData,
+    ModelStatus,
+    ModelSummary,
+    ModelType,
+    ModelUpdateRequest,
+    RuntimeModelConfig,
 )
 from .status import EvaluationStatus, TaskStatus
 

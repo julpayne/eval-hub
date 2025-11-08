@@ -1,24 +1,23 @@
 """Shared test configuration and fixtures."""
 
-import pytest
-import tempfile
 import os
-import yaml
-from pathlib import Path
+import tempfile
 from unittest.mock import Mock, patch
 
-from eval_hub.services.provider_service import ProviderService
+import pytest
+import yaml
+
 from eval_hub.models.provider import (
-    Provider,
-    ProviderSummary,
     Benchmark,
-    Collection,
     BenchmarkDetail,
-    ListProvidersResponse,
+    Collection,
     ListBenchmarksResponse,
     ListCollectionsResponse,
+    ListProvidersResponse,
+    Provider,
     ProviderType,
 )
+from eval_hub.services.provider_service import ProviderService
 
 
 @pytest.fixture
@@ -32,7 +31,7 @@ def sample_benchmark_data():
         "metrics": ["accuracy", "f1_score"],
         "num_few_shot": 5,
         "dataset_size": 1000,
-        "tags": ["test", "sample"]
+        "tags": ["test", "sample"],
     }
 
 
@@ -45,7 +44,7 @@ def sample_provider_data(sample_benchmark_data):
         "description": "A provider for testing",
         "provider_type": "external",
         "base_url": "http://test:8080",
-        "benchmarks": [sample_benchmark_data]
+        "benchmarks": [sample_benchmark_data],
     }
 
 
@@ -69,9 +68,9 @@ def minimal_providers_yaml():
                         "metrics": ["accuracy"],
                         "num_few_shot": 0,
                         "dataset_size": 100,
-                        "tags": ["test"]
+                        "tags": ["test"],
                     }
-                ]
+                ],
             }
         ],
         "collections": [
@@ -80,10 +79,13 @@ def minimal_providers_yaml():
                 "name": "Minimal Collection",
                 "description": "Minimal collection for testing",
                 "benchmarks": [
-                    {"provider_id": "minimal_provider", "benchmark_id": "minimal_benchmark"}
-                ]
+                    {
+                        "provider_id": "minimal_provider",
+                        "benchmark_id": "minimal_benchmark",
+                    }
+                ],
             }
-        ]
+        ],
     }
 
 
@@ -107,7 +109,7 @@ def comprehensive_providers_yaml():
                         "metrics": ["accuracy", "acc_norm"],
                         "num_few_shot": 10,
                         "dataset_size": 10042,
-                        "tags": ["reasoning", "commonsense"]
+                        "tags": ["reasoning", "commonsense"],
                     },
                     {
                         "benchmark_id": "gsm8k",
@@ -117,9 +119,9 @@ def comprehensive_providers_yaml():
                         "metrics": ["exact_match"],
                         "num_few_shot": 5,
                         "dataset_size": 1319,
-                        "tags": ["math", "arithmetic"]
-                    }
-                ]
+                        "tags": ["math", "arithmetic"],
+                    },
+                ],
             },
             {
                 "provider_id": "custom_provider",
@@ -136,10 +138,10 @@ def comprehensive_providers_yaml():
                         "metrics": ["custom_score"],
                         "num_few_shot": 0,
                         "dataset_size": 500,
-                        "tags": ["custom", "domain"]
+                        "tags": ["custom", "domain"],
                     }
-                ]
-            }
+                ],
+            },
         ],
         "collections": [
             {
@@ -147,9 +149,12 @@ def comprehensive_providers_yaml():
                 "name": "General Evaluation",
                 "description": "General purpose evaluation suite",
                 "benchmarks": [
-                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "hellaswag"},
-                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "gsm8k"}
-                ]
+                    {
+                        "provider_id": "lm_evaluation_harness",
+                        "benchmark_id": "hellaswag",
+                    },
+                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "gsm8k"},
+                ],
             },
             {
                 "collection_id": "custom_eval",
@@ -157,17 +162,18 @@ def comprehensive_providers_yaml():
                 "description": "Custom evaluation suite",
                 "benchmarks": [
                     {"provider_id": "custom_provider", "benchmark_id": "custom_task"}
-                ]
-            }
-        ]
+                ],
+            },
+        ],
     }
 
 
 @pytest.fixture
 def temp_yaml_file():
     """Create a temporary YAML file for testing."""
+
     def _create_temp_file(data):
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(data, f)
             return f.name
 
@@ -193,20 +199,15 @@ def mock_provider_service():
 
     # Default mock responses
     service.get_all_providers.return_value = ListProvidersResponse(
-        providers=[],
-        total_providers=0,
-        total_benchmarks=0
+        providers=[], total_providers=0, total_benchmarks=0
     )
 
     service.get_all_benchmarks.return_value = ListBenchmarksResponse(
-        benchmarks=[],
-        total_count=0,
-        providers_included=[]
+        benchmarks=[], total_count=0, providers_included=[]
     )
 
     service.get_all_collections.return_value = ListCollectionsResponse(
-        collections=[],
-        total_collections=0
+        collections=[], total_collections=0
     )
 
     service.get_provider_by_id.return_value = None
@@ -221,7 +222,7 @@ def provider_service_with_data(comprehensive_providers_yaml, temp_yaml_file):
     """Create a real provider service with test data."""
     yaml_file = temp_yaml_file(comprehensive_providers_yaml)
 
-    with patch('eval_hub.services.provider_service.PROVIDERS_DATA_PATH', yaml_file):
+    with patch("eval_hub.services.provider_service.PROVIDERS_DATA_PATH", yaml_file):
         service = ProviderService()
         yield service
 
@@ -235,7 +236,7 @@ class TestDataFactory:
         name="Test Benchmark",
         category="test",
         provider_id="test_provider",
-        **kwargs
+        **kwargs,
     ):
         """Create a test benchmark."""
         defaults = {
@@ -243,15 +244,12 @@ class TestDataFactory:
             "metrics": ["accuracy"],
             "num_few_shot": 0,
             "dataset_size": 100,
-            "tags": ["test"]
+            "tags": ["test"],
         }
         defaults.update(kwargs)
 
         return Benchmark(
-            benchmark_id=benchmark_id,
-            name=name,
-            category=category,
-            **defaults
+            benchmark_id=benchmark_id, name=name, category=category, **defaults
         )
 
     @staticmethod
@@ -259,7 +257,7 @@ class TestDataFactory:
         provider_id="test_provider",
         provider_name="Test Provider",
         benchmarks=None,
-        **kwargs
+        **kwargs,
     ):
         """Create a test provider."""
         if benchmarks is None:
@@ -268,7 +266,7 @@ class TestDataFactory:
         defaults = {
             "description": f"{provider_name} description",
             "provider_type": ProviderType.EXTERNAL,
-            "base_url": "http://test:8080"
+            "base_url": "http://test:8080",
         }
         defaults.update(kwargs)
 
@@ -276,14 +274,12 @@ class TestDataFactory:
             provider_id=provider_id,
             provider_name=provider_name,
             benchmarks=benchmarks,
-            **defaults
+            **defaults,
         )
 
     @staticmethod
     def create_benchmark_detail(
-        benchmark_id="test_benchmark",
-        provider_id="test_provider",
-        **kwargs
+        benchmark_id="test_benchmark", provider_id="test_provider", **kwargs
     ):
         """Create a test benchmark detail."""
         defaults = {
@@ -296,14 +292,12 @@ class TestDataFactory:
             "dataset_size": 100,
             "tags": ["test"],
             "provider_type": "external",
-            "base_url": "http://test:8080"
+            "base_url": "http://test:8080",
         }
         defaults.update(kwargs)
 
         return BenchmarkDetail(
-            benchmark_id=benchmark_id,
-            provider_id=provider_id,
-            **defaults
+            benchmark_id=benchmark_id, provider_id=provider_id, **defaults
         )
 
     @staticmethod
@@ -311,22 +305,19 @@ class TestDataFactory:
         collection_id="test_collection",
         name="Test Collection",
         benchmarks=None,
-        **kwargs
+        **kwargs,
     ):
         """Create a test collection."""
         if benchmarks is None:
-            benchmarks = [{"provider_id": "test_provider", "benchmark_id": "test_benchmark"}]
+            benchmarks = [
+                {"provider_id": "test_provider", "benchmark_id": "test_benchmark"}
+            ]
 
-        defaults = {
-            "description": f"{name} description"
-        }
+        defaults = {"description": f"{name} description"}
         defaults.update(kwargs)
 
         return Collection(
-            collection_id=collection_id,
-            name=name,
-            benchmarks=benchmarks,
-            **defaults
+            collection_id=collection_id, name=name, benchmarks=benchmarks, **defaults
         )
 
 
@@ -362,24 +353,12 @@ def cleanup_temp_files():
 # Test markers for categorizing tests
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "unit: mark test as a unit test"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
-    config.addinivalue_line(
-        "markers", "api: mark test as an API test"
-    )
-    config.addinivalue_line(
-        "markers", "service: mark test as a service test"
-    )
-    config.addinivalue_line(
-        "markers", "provider: mark test as provider-related"
-    )
+    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line("markers", "api: mark test as an API test")
+    config.addinivalue_line("markers", "service: mark test as a service test")
+    config.addinivalue_line("markers", "provider: mark test as provider-related")
 
 
 # Pytest collection customization

@@ -2,8 +2,7 @@
 
 import statistics
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Union
-from uuid import UUID
+from typing import Any
 
 from ..core.config import Settings
 from ..core.logging import get_logger
@@ -25,14 +24,14 @@ class ResponseBuilder:
     async def build_response(
         self,
         request: EvaluationRequest,
-        results: List[EvaluationResult],
-        experiment_url: Optional[str] = None
+        results: list[EvaluationResult],
+        experiment_url: str | None = None,
     ) -> EvaluationResponse:
         """Build a comprehensive response from evaluation results."""
         self.logger.info(
             "Building evaluation response",
             request_id=str(request.request_id),
-            result_count=len(results)
+            result_count=len(results),
         )
 
         # Calculate status counts
@@ -42,10 +41,14 @@ class ResponseBuilder:
         failed_evaluations = status_counts.get(EvaluationStatus.FAILED, 0)
 
         # Determine overall status
-        overall_status = self._determine_overall_status(status_counts, total_evaluations)
+        overall_status = self._determine_overall_status(
+            status_counts, total_evaluations
+        )
 
         # Calculate progress percentage
-        progress_percentage = self._calculate_progress_percentage(status_counts, total_evaluations)
+        progress_percentage = self._calculate_progress_percentage(
+            status_counts, total_evaluations
+        )
 
         # Aggregate metrics
         aggregated_metrics = await self._aggregate_metrics(results)
@@ -74,12 +77,14 @@ class ResponseBuilder:
             overall_status=overall_status,
             progress_percentage=progress_percentage,
             completed_count=completed_evaluations,
-            failed_count=failed_evaluations
+            failed_count=failed_evaluations,
         )
 
         return response
 
-    def _count_results_by_status(self, results: List[EvaluationResult]) -> Dict[EvaluationStatus, int]:
+    def _count_results_by_status(
+        self, results: list[EvaluationResult]
+    ) -> dict[EvaluationStatus, int]:
         """Count results by their status."""
         counts = {}
         for result in results:
@@ -88,7 +93,7 @@ class ResponseBuilder:
         return counts
 
     def _determine_overall_status(
-        self, status_counts: Dict[EvaluationStatus, int], total_evaluations: int
+        self, status_counts: dict[EvaluationStatus, int], total_evaluations: int
     ) -> EvaluationStatus:
         """Determine the overall status based on individual result statuses."""
         if not status_counts:
@@ -119,7 +124,7 @@ class ResponseBuilder:
             return EvaluationStatus.COMPLETED
 
     def _calculate_progress_percentage(
-        self, status_counts: Dict[EvaluationStatus, int], total_evaluations: int
+        self, status_counts: dict[EvaluationStatus, int], total_evaluations: int
     ) -> float:
         """Calculate overall progress percentage."""
         if total_evaluations == 0:
@@ -134,13 +139,17 @@ class ResponseBuilder:
         progress_weight = completed + failed + (running * 0.5)
         return min(100.0, (progress_weight / total_evaluations) * 100.0)
 
-    async def _aggregate_metrics(self, results: List[EvaluationResult]) -> Dict[str, Union[float, int, str]]:
+    async def _aggregate_metrics(
+        self, results: list[EvaluationResult]
+    ) -> dict[str, float | int | str]:
         """Aggregate metrics across all evaluation results."""
         if not results:
             return {}
 
         # Only aggregate metrics from completed evaluations
-        completed_results = [r for r in results if r.status == EvaluationStatus.COMPLETED]
+        completed_results = [
+            r for r in results if r.status == EvaluationStatus.COMPLETED
+        ]
 
         if not completed_results:
             return {"status": "no_completed_evaluations"}
@@ -148,7 +157,7 @@ class ResponseBuilder:
         self.logger.debug(
             "Aggregating metrics",
             total_results=len(results),
-            completed_results=len(completed_results)
+            completed_results=len(completed_results),
         )
 
         # Collect all metric names
@@ -173,16 +182,24 @@ class ResponseBuilder:
                 aggregated[f"{metric_name}_median"] = statistics.median(values)
                 aggregated[f"{metric_name}_min"] = min(values)
                 aggregated[f"{metric_name}_max"] = max(values)
-                aggregated[f"{metric_name}_std"] = statistics.stdev(values) if len(values) > 1 else 0.0
+                aggregated[f"{metric_name}_std"] = (
+                    statistics.stdev(values) if len(values) > 1 else 0.0
+                )
                 aggregated[f"{metric_name}_count"] = len(values)
 
         # Add summary statistics
         aggregated["total_evaluations"] = len(results)
         aggregated["completed_evaluations"] = len(completed_results)
-        aggregated["success_rate"] = len(completed_results) / len(results) if results else 0.0
+        aggregated["success_rate"] = (
+            len(completed_results) / len(results) if results else 0.0
+        )
 
         # Calculate average duration
-        durations = [r.duration_seconds for r in completed_results if r.duration_seconds is not None]
+        durations = [
+            r.duration_seconds
+            for r in completed_results
+            if r.duration_seconds is not None
+        ]
         if durations:
             aggregated["avg_duration_seconds"] = statistics.mean(durations)
             aggregated["total_duration_seconds"] = sum(durations)
@@ -191,19 +208,29 @@ class ResponseBuilder:
         backend_counts = {}
         benchmark_counts = {}
         for result in completed_results:
-            backend_counts[result.backend_name] = backend_counts.get(result.backend_name, 0) + 1
-            benchmark_counts[result.benchmark_name] = benchmark_counts.get(result.benchmark_name, 0) + 1
+            backend_counts[result.backend_name] = (
+                backend_counts.get(result.backend_name, 0) + 1
+            )
+            benchmark_counts[result.benchmark_name] = (
+                benchmark_counts.get(result.benchmark_name, 0) + 1
+            )
 
         aggregated["backends_used"] = len(backend_counts)
         aggregated["benchmarks_used"] = len(benchmark_counts)
-        aggregated["most_used_backend"] = max(backend_counts, key=backend_counts.get) if backend_counts else None
-        aggregated["most_used_benchmark"] = max(benchmark_counts, key=benchmark_counts.get) if benchmark_counts else None
+        aggregated["most_used_backend"] = (
+            max(backend_counts, key=backend_counts.get) if backend_counts else None
+        )
+        aggregated["most_used_benchmark"] = (
+            max(benchmark_counts, key=benchmark_counts.get)
+            if benchmark_counts
+            else None
+        )
 
         return aggregated
 
     def _estimate_completion_time(
-        self, results: List[EvaluationResult], overall_status: EvaluationStatus
-    ) -> Optional[datetime]:
+        self, results: list[EvaluationResult], overall_status: EvaluationStatus
+    ) -> datetime | None:
         """Estimate when all evaluations will be completed."""
         if overall_status in [EvaluationStatus.COMPLETED, EvaluationStatus.FAILED]:
             return None  # Already completed
@@ -215,10 +242,16 @@ class ResponseBuilder:
             return None
 
         # Estimate based on average duration of completed evaluations
-        completed_results = [r for r in results if r.status == EvaluationStatus.COMPLETED and r.duration_seconds]
+        completed_results = [
+            r
+            for r in results
+            if r.status == EvaluationStatus.COMPLETED and r.duration_seconds
+        ]
 
         if completed_results:
-            avg_duration = statistics.mean([r.duration_seconds for r in completed_results])
+            avg_duration = statistics.mean(
+                [r.duration_seconds for r in completed_results]
+            )
         else:
             # Use default estimation
             avg_duration = 300  # 5 minutes default
@@ -227,7 +260,9 @@ class ResponseBuilder:
         remaining_count = len(running_results) + len(pending_results)
 
         # Account for concurrency
-        concurrent_slots = min(remaining_count, self.settings.max_concurrent_evaluations)
+        concurrent_slots = min(
+            remaining_count, self.settings.max_concurrent_evaluations
+        )
         if concurrent_slots > 0:
             estimated_seconds = (remaining_count / concurrent_slots) * avg_duration
         else:
@@ -236,11 +271,13 @@ class ResponseBuilder:
         # Add buffer time
         estimated_seconds *= 1.2  # 20% buffer
 
-        return datetime.utcnow().replace(microsecond=0) + timedelta(seconds=int(estimated_seconds))
+        return datetime.utcnow().replace(microsecond=0) + timedelta(
+            seconds=int(estimated_seconds)
+        )
 
     async def build_summary_response(
-        self, request: EvaluationRequest, results: List[EvaluationResult]
-    ) -> Dict[str, Any]:
+        self, request: EvaluationRequest, results: list[EvaluationResult]
+    ) -> dict[str, Any]:
         """Build a summary response with key insights."""
         aggregated_metrics = await self._aggregate_metrics(results)
         status_counts = self._count_results_by_status(results)
@@ -251,11 +288,17 @@ class ResponseBuilder:
         # Success rate insight
         success_rate = aggregated_metrics.get("success_rate", 0.0)
         if success_rate >= 0.9:
-            insights.append("Excellent success rate - all evaluations completed successfully")
+            insights.append(
+                "Excellent success rate - all evaluations completed successfully"
+            )
         elif success_rate >= 0.7:
-            insights.append("Good success rate - most evaluations completed successfully")
+            insights.append(
+                "Good success rate - most evaluations completed successfully"
+            )
         else:
-            insights.append("Some evaluations failed - review error messages for details")
+            insights.append(
+                "Some evaluations failed - review error messages for details"
+            )
 
         # Performance insights
         if "avg_duration_seconds" in aggregated_metrics:
@@ -265,11 +308,15 @@ class ResponseBuilder:
             elif avg_duration < 300:
                 insights.append("Moderate evaluation execution time")
             else:
-                insights.append("Long evaluation execution time - consider optimization")
+                insights.append(
+                    "Long evaluation execution time - consider optimization"
+                )
 
         # Backend insights
         if aggregated_metrics.get("backends_used", 0) > 1:
-            insights.append(f"Multi-backend evaluation across {aggregated_metrics['backends_used']} backends")
+            insights.append(
+                f"Multi-backend evaluation across {aggregated_metrics['backends_used']} backends"
+            )
 
         return {
             "request_id": str(request.request_id),
@@ -280,12 +327,16 @@ class ResponseBuilder:
                 "backends_used": aggregated_metrics.get("backends_used", 0),
                 "benchmarks_used": aggregated_metrics.get("benchmarks_used", 0),
             },
-            "status_breakdown": {status.value: count for status, count in status_counts.items()},
+            "status_breakdown": {
+                status.value: count for status, count in status_counts.items()
+            },
             "insights": insights,
             "top_metrics": self._extract_top_metrics(aggregated_metrics),
         }
 
-    def _extract_top_metrics(self, aggregated_metrics: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_top_metrics(
+        self, aggregated_metrics: dict[str, Any]
+    ) -> dict[str, Any]:
         """Extract the most important metrics for summary display."""
         top_metrics = {}
 

@@ -2,8 +2,8 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field, ConfigDict, field_validator, HttpUrl
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ModelType(str, Enum):
@@ -32,11 +32,19 @@ class ModelCapabilities(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    max_tokens: Optional[int] = Field(None, description="Maximum tokens supported by the model")
-    supports_streaming: bool = Field(default=False, description="Whether the model supports streaming responses")
-    supports_function_calling: bool = Field(default=False, description="Whether the model supports function calling")
-    supports_vision: bool = Field(default=False, description="Whether the model supports vision/image inputs")
-    context_window: Optional[int] = Field(None, description="Model's context window size")
+    max_tokens: int | None = Field(
+        None, description="Maximum tokens supported by the model"
+    )
+    supports_streaming: bool = Field(
+        default=False, description="Whether the model supports streaming responses"
+    )
+    supports_function_calling: bool = Field(
+        default=False, description="Whether the model supports function calling"
+    )
+    supports_vision: bool = Field(
+        default=False, description="Whether the model supports vision/image inputs"
+    )
+    context_window: int | None = Field(None, description="Model's context window size")
 
 
 class ModelConfig(BaseModel):
@@ -44,13 +52,23 @@ class ModelConfig(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Default temperature setting")
-    max_tokens: Optional[int] = Field(None, gt=0, description="Default max tokens for responses")
-    top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Default top_p setting")
-    frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="Default frequency penalty")
-    presence_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="Default presence penalty")
-    timeout: Optional[int] = Field(30, gt=0, description="Request timeout in seconds")
-    retry_attempts: Optional[int] = Field(3, ge=0, description="Number of retry attempts")
+    temperature: float | None = Field(
+        None, ge=0.0, le=2.0, description="Default temperature setting"
+    )
+    max_tokens: int | None = Field(
+        None, gt=0, description="Default max tokens for responses"
+    )
+    top_p: float | None = Field(
+        None, ge=0.0, le=1.0, description="Default top_p setting"
+    )
+    frequency_penalty: float | None = Field(
+        None, ge=-2.0, le=2.0, description="Default frequency penalty"
+    )
+    presence_penalty: float | None = Field(
+        None, ge=-2.0, le=2.0, description="Default presence penalty"
+    )
+    timeout: int | None = Field(30, gt=0, description="Request timeout in seconds")
+    retry_attempts: int | None = Field(3, ge=0, description="Number of retry attempts")
 
 
 class Model(BaseModel):
@@ -63,24 +81,36 @@ class Model(BaseModel):
     description: str = Field(..., description="Model description")
     model_type: ModelType = Field(..., description="Type of model")
     base_url: str = Field(..., description="Base URL for the model API")
-    api_key_required: bool = Field(default=True, description="Whether an API key is required")
-    model_path: Optional[str] = Field(None, description="Model path or identifier within the service")
-    capabilities: ModelCapabilities = Field(default_factory=ModelCapabilities, description="Model capabilities")
-    config: ModelConfig = Field(default_factory=ModelConfig, description="Default model configuration")
+    api_key_required: bool = Field(
+        default=True, description="Whether an API key is required"
+    )
+    model_path: str | None = Field(
+        None, description="Model path or identifier within the service"
+    )
+    capabilities: ModelCapabilities = Field(
+        default_factory=ModelCapabilities, description="Model capabilities"
+    )
+    config: ModelConfig = Field(
+        default_factory=ModelConfig, description="Default model configuration"
+    )
     status: ModelStatus = Field(default=ModelStatus.ACTIVE, description="Model status")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="When the model was registered")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the model was last updated")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, description="When the model was registered"
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, description="When the model was last updated"
+    )
 
-    @field_validator('base_url')
+    @field_validator("base_url")
     @classmethod
     def validate_base_url(cls, v: str) -> str:
         """Validate that base_url is a valid URL."""
-        if not v.startswith(('http://', 'https://')):
+        if not v.startswith(("http://", "https://")):
             raise ValueError("base_url must be a valid HTTP or HTTPS URL")
         return v
 
-    @field_validator('model_id')
+    @field_validator("model_id")
     @classmethod
     def validate_model_id(cls, v: str) -> str:
         """Validate model_id format."""
@@ -88,8 +118,11 @@ class Model(BaseModel):
             raise ValueError("model_id cannot be empty")
         # Allow alphanumeric, hyphens, underscores, and dots
         import re
-        if not re.match(r'^[a-zA-Z0-9._-]+$', v):
-            raise ValueError("model_id can only contain letters, numbers, dots, hyphens, and underscores")
+
+        if not re.match(r"^[a-zA-Z0-9._-]+$", v):
+            raise ValueError(
+                "model_id can only contain letters, numbers, dots, hyphens, and underscores"
+            )
         return v.strip()
 
 
@@ -104,7 +137,7 @@ class ModelSummary(BaseModel):
     model_type: ModelType = Field(..., description="Type of model")
     base_url: str = Field(..., description="Base URL for the model API")
     status: ModelStatus = Field(..., description="Model status")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
     created_at: datetime = Field(..., description="When the model was registered")
 
 
@@ -118,12 +151,18 @@ class ModelRegistrationRequest(BaseModel):
     description: str = Field(..., description="Model description")
     model_type: ModelType = Field(..., description="Type of model")
     base_url: str = Field(..., description="Base URL for the model API")
-    api_key_required: bool = Field(default=True, description="Whether an API key is required")
-    model_path: Optional[str] = Field(None, description="Model path or identifier within the service")
-    capabilities: Optional[ModelCapabilities] = Field(None, description="Model capabilities")
-    config: Optional[ModelConfig] = Field(None, description="Default model configuration")
+    api_key_required: bool = Field(
+        default=True, description="Whether an API key is required"
+    )
+    model_path: str | None = Field(
+        None, description="Model path or identifier within the service"
+    )
+    capabilities: ModelCapabilities | None = Field(
+        None, description="Model capabilities"
+    )
+    config: ModelConfig | None = Field(None, description="Default model configuration")
     status: ModelStatus = Field(default=ModelStatus.ACTIVE, description="Model status")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
 
 class ModelUpdateRequest(BaseModel):
@@ -131,16 +170,22 @@ class ModelUpdateRequest(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    model_name: Optional[str] = Field(None, description="Human-readable model name")
-    description: Optional[str] = Field(None, description="Model description")
-    model_type: Optional[ModelType] = Field(None, description="Type of model")
-    base_url: Optional[str] = Field(None, description="Base URL for the model API")
-    api_key_required: Optional[bool] = Field(None, description="Whether an API key is required")
-    model_path: Optional[str] = Field(None, description="Model path or identifier within the service")
-    capabilities: Optional[ModelCapabilities] = Field(None, description="Model capabilities")
-    config: Optional[ModelConfig] = Field(None, description="Default model configuration")
-    status: Optional[ModelStatus] = Field(None, description="Model status")
-    tags: Optional[List[str]] = Field(None, description="Tags for categorization")
+    model_name: str | None = Field(None, description="Human-readable model name")
+    description: str | None = Field(None, description="Model description")
+    model_type: ModelType | None = Field(None, description="Type of model")
+    base_url: str | None = Field(None, description="Base URL for the model API")
+    api_key_required: bool | None = Field(
+        None, description="Whether an API key is required"
+    )
+    model_path: str | None = Field(
+        None, description="Model path or identifier within the service"
+    )
+    capabilities: ModelCapabilities | None = Field(
+        None, description="Model capabilities"
+    )
+    config: ModelConfig | None = Field(None, description="Default model configuration")
+    status: ModelStatus | None = Field(None, description="Model status")
+    tags: list[str] | None = Field(None, description="Tags for categorization")
 
 
 class ListModelsResponse(BaseModel):
@@ -148,9 +193,11 @@ class ListModelsResponse(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    models: List[ModelSummary] = Field(..., description="List of available models")
+    models: list[ModelSummary] = Field(..., description="List of available models")
     total_models: int = Field(..., description="Total number of models")
-    runtime_models: List[ModelSummary] = Field(default_factory=list, description="Models specified via environment variables")
+    runtime_models: list[ModelSummary] = Field(
+        default_factory=list, description="Models specified via environment variables"
+    )
 
 
 class RuntimeModelConfig(BaseModel):
@@ -160,11 +207,19 @@ class RuntimeModelConfig(BaseModel):
 
     model_id: str = Field(..., description="Runtime model identifier")
     model_name: str = Field(..., description="Runtime model name")
-    description: str = Field(default="Runtime-specified model", description="Model description")
-    model_type: ModelType = Field(default=ModelType.OPENAI_COMPATIBLE, description="Type of model")
+    description: str = Field(
+        default="Runtime-specified model", description="Model description"
+    )
+    model_type: ModelType = Field(
+        default=ModelType.OPENAI_COMPATIBLE, description="Type of model"
+    )
     base_url: str = Field(..., description="Base URL from environment variable")
-    api_key_required: bool = Field(default=True, description="Whether an API key is required")
-    model_path: Optional[str] = Field(None, description="Model path or identifier within the service")
+    api_key_required: bool = Field(
+        default=True, description="Whether an API key is required"
+    )
+    model_path: str | None = Field(
+        None, description="Model path or identifier within the service"
+    )
 
 
 class ModelsData(BaseModel):
@@ -172,10 +227,13 @@ class ModelsData(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    models: List[Model] = Field(default_factory=list, description="List of registered models")
+    models: list[Model] = Field(
+        default_factory=list, description="List of registered models"
+    )
 
 
 # Model Server structures
+
 
 class ServerModel(BaseModel):
     """A model available on a model server."""
@@ -183,11 +241,13 @@ class ServerModel(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     model_name: str = Field(..., description="Name of the model on the server")
-    description: Optional[str] = Field(None, description="Model description")
-    capabilities: Optional[ModelCapabilities] = Field(None, description="Model capabilities")
-    config: Optional[ModelConfig] = Field(None, description="Default model configuration")
+    description: str | None = Field(None, description="Model description")
+    capabilities: ModelCapabilities | None = Field(
+        None, description="Model capabilities"
+    )
+    config: ModelConfig | None = Field(None, description="Default model configuration")
     status: ModelStatus = Field(default=ModelStatus.ACTIVE, description="Model status")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
 
 class ModelServer(BaseModel):
@@ -198,31 +258,44 @@ class ModelServer(BaseModel):
     server_id: str = Field(..., description="Unique server identifier")
     server_type: ModelType = Field(..., description="Type of model server")
     base_url: str = Field(..., description="Base URL for the server API")
-    api_key_required: bool = Field(default=True, description="Whether an API key is required")
-    models: List[ServerModel] = Field(default_factory=list, description="List of models available on this server")
-    server_config: Optional[ModelConfig] = Field(None, description="Default server-level configuration")
+    api_key_required: bool = Field(
+        default=True, description="Whether an API key is required"
+    )
+    models: list[ServerModel] = Field(
+        default_factory=list, description="List of models available on this server"
+    )
+    server_config: ModelConfig | None = Field(
+        None, description="Default server-level configuration"
+    )
     status: ModelStatus = Field(default=ModelStatus.ACTIVE, description="Server status")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="When the server was registered")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="When the server was last updated")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, description="When the server was registered"
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, description="When the server was last updated"
+    )
 
-    @field_validator('base_url')
+    @field_validator("base_url")
     @classmethod
     def validate_base_url(cls, v: str) -> str:
         """Validate that base_url is a valid URL."""
-        if not v.startswith(('http://', 'https://')):
+        if not v.startswith(("http://", "https://")):
             raise ValueError("base_url must be a valid HTTP or HTTPS URL")
         return v
 
-    @field_validator('server_id')
+    @field_validator("server_id")
     @classmethod
     def validate_server_id(cls, v: str) -> str:
         """Validate server_id format."""
         if not v.strip():
             raise ValueError("server_id cannot be empty")
         import re
-        if not re.match(r'^[a-zA-Z0-9._-]+$', v):
-            raise ValueError("server_id can only contain letters, numbers, dots, hyphens, and underscores")
+
+        if not re.match(r"^[a-zA-Z0-9._-]+$", v):
+            raise ValueError(
+                "server_id can only contain letters, numbers, dots, hyphens, and underscores"
+            )
         return v.strip()
 
 
@@ -236,7 +309,7 @@ class ModelServerSummary(BaseModel):
     base_url: str = Field(..., description="Base URL for the server API")
     model_count: int = Field(..., description="Number of models on this server")
     status: ModelStatus = Field(..., description="Server status")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
     created_at: datetime = Field(..., description="When the server was registered")
 
 
@@ -248,23 +321,35 @@ class ModelServerRegistrationRequest(BaseModel):
     server_id: str = Field(..., description="Unique server identifier")
     server_type: ModelType = Field(..., description="Type of model server")
     base_url: str = Field(..., description="Base URL for the server API")
-    api_key_required: bool = Field(default=True, description="Whether an API key is required")
-    models: List[ServerModel] = Field(default_factory=list, description="List of models available on this server")
-    server_config: Optional[ModelConfig] = Field(None, description="Default server-level configuration")
+    api_key_required: bool = Field(
+        default=True, description="Whether an API key is required"
+    )
+    models: list[ServerModel] = Field(
+        default_factory=list, description="List of models available on this server"
+    )
+    server_config: ModelConfig | None = Field(
+        None, description="Default server-level configuration"
+    )
     status: ModelStatus = Field(default=ModelStatus.ACTIVE, description="Server status")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
 
 class ModelServerUpdateRequest(BaseModel):
     """Request model for updating an existing model server."""
 
     model_config = ConfigDict(extra="allow")
-    base_url: Optional[str] = Field(None, description="Base URL for the server API")
-    api_key_required: Optional[bool] = Field(None, description="Whether an API key is required")
-    models: Optional[List[ServerModel]] = Field(None, description="List of models available on this server")
-    server_config: Optional[ModelConfig] = Field(None, description="Default server-level configuration")
-    status: Optional[ModelStatus] = Field(None, description="Server status")
-    tags: Optional[List[str]] = Field(None, description="Tags for categorization")
+    base_url: str | None = Field(None, description="Base URL for the server API")
+    api_key_required: bool | None = Field(
+        None, description="Whether an API key is required"
+    )
+    models: list[ServerModel] | None = Field(
+        None, description="List of models available on this server"
+    )
+    server_config: ModelConfig | None = Field(
+        None, description="Default server-level configuration"
+    )
+    status: ModelStatus | None = Field(None, description="Server status")
+    tags: list[str] | None = Field(None, description="Tags for categorization")
 
 
 class ListModelServersResponse(BaseModel):
@@ -272,6 +357,10 @@ class ListModelServersResponse(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    servers: List[ModelServerSummary] = Field(..., description="List of available model servers")
+    servers: list[ModelServerSummary] = Field(
+        ..., description="List of available model servers"
+    )
     total_servers: int = Field(..., description="Total number of servers")
-    runtime_servers: List[ModelServerSummary] = Field(default_factory=list, description="Servers specified via environment variables")
+    runtime_servers: list[ModelServerSummary] = Field(
+        default_factory=list, description="Servers specified via environment variables"
+    )

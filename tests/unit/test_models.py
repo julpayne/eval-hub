@@ -1,18 +1,19 @@
 """Unit tests for data models."""
 
-import pytest
 from datetime import datetime
 from uuid import uuid4
 
+import pytest
+
 from eval_hub.models.evaluation import (
-    EvaluationRequest,
-    EvaluationSpec,
     BackendSpec,
-    BenchmarkSpec,
-    RiskCategory,
     BackendType,
+    BenchmarkSpec,
+    EvaluationRequest,
     EvaluationResult,
+    EvaluationSpec,
     EvaluationStatus,
+    RiskCategory,
 )
 
 
@@ -28,7 +29,7 @@ class TestEvaluationModels:
             batch_size=8,
             limit=1000,
             device="cuda",
-            config={"custom_param": "value"}
+            config={"custom_param": "value"},
         )
 
         assert benchmark.name == "hellaswag"
@@ -41,18 +42,14 @@ class TestEvaluationModels:
 
     def test_backend_spec_creation(self):
         """Test BackendSpec model creation."""
-        benchmark = BenchmarkSpec(
-            name="arc_easy",
-            tasks=["arc_easy"],
-            num_fewshot=5
-        )
+        benchmark = BenchmarkSpec(name="arc_easy", tasks=["arc_easy"], num_fewshot=5)
 
         backend = BackendSpec(
             name="lm-evaluation-harness",
             type=BackendType.LMEVAL,
             endpoint="http://localhost:8080",
             config={"timeout": 3600},
-            benchmarks=[benchmark]
+            benchmarks=[benchmark],
         )
 
         assert backend.name == "lm-evaluation-harness"
@@ -66,9 +63,7 @@ class TestEvaluationModels:
         """Test EvaluationSpec model creation."""
         benchmark = BenchmarkSpec(name="test", tasks=["test"])
         backend = BackendSpec(
-            name="test-backend",
-            type=BackendType.CUSTOM,
-            benchmarks=[benchmark]
+            name="test-backend", type=BackendType.CUSTOM, benchmarks=[benchmark]
         )
 
         eval_spec = EvaluationSpec(
@@ -78,7 +73,7 @@ class TestEvaluationModels:
             risk_category=RiskCategory.MEDIUM,
             priority=1,
             timeout_minutes=30,
-            retry_attempts=2
+            retry_attempts=2,
         )
 
         assert eval_spec.name == "Test Evaluation"
@@ -94,21 +89,17 @@ class TestEvaluationModels:
         """Test EvaluationRequest model creation."""
         benchmark = BenchmarkSpec(name="test", tasks=["test"])
         backend = BackendSpec(
-            name="test-backend",
-            type=BackendType.CUSTOM,
-            benchmarks=[benchmark]
+            name="test-backend", type=BackendType.CUSTOM, benchmarks=[benchmark]
         )
         eval_spec = EvaluationSpec(
-            name="Test Evaluation",
-            model_name="test-model",
-            backends=[backend]
+            name="Test Evaluation", model_name="test-model", backends=[backend]
         )
 
         request = EvaluationRequest(
             evaluations=[eval_spec],
             experiment_name="test-experiment",
             tags={"team": "ai", "project": "eval"},
-            async_mode=True
+            async_mode=True,
         )
 
         assert len(request.evaluations) == 1
@@ -132,7 +123,7 @@ class TestEvaluationModels:
             started_at=datetime.utcnow(),
             completed_at=datetime.utcnow(),
             duration_seconds=120.5,
-            mlflow_run_id="test-run-123"
+            mlflow_run_id="test-run-123",
         )
 
         assert result.evaluation_id == eval_id
@@ -196,11 +187,7 @@ class TestEvaluationModels:
         assert benchmark.device is None
         assert benchmark.config == {}
 
-        eval_spec = EvaluationSpec(
-            name="Test",
-            model_name="test-model",
-            backends=[]
-        )
+        eval_spec = EvaluationSpec(name="Test", model_name="test-model", backends=[])
         assert eval_spec.risk_category is None
         assert eval_spec.priority == 0
         assert eval_spec.timeout_minutes == 60
@@ -212,9 +199,9 @@ class TestEvaluationModels:
         benchmark = BenchmarkSpec(
             name="test",
             tasks=["test"],
-            extra_field="extra_value"  # This should be allowed
+            extra_field="extra_value",  # This should be allowed
         )
-        assert hasattr(benchmark, 'extra_field')
+        assert hasattr(benchmark, "extra_field")
         assert benchmark.extra_field == "extra_value"
 
 
@@ -251,7 +238,7 @@ class TestModelDataStructures:
             supports_streaming=True,
             supports_function_calling=False,
             supports_vision=True,
-            context_window=4096
+            context_window=4096,
         )
 
         assert capabilities.max_tokens == 8192
@@ -283,7 +270,7 @@ class TestModelDataStructures:
             frequency_penalty=0.1,
             presence_penalty=-0.1,
             timeout=60,
-            retry_attempts=5
+            retry_attempts=5,
         )
 
         assert config.temperature == 0.7
@@ -310,8 +297,15 @@ class TestModelDataStructures:
 
     def test_model_creation(self):
         """Test Model creation with all fields."""
-        from eval_hub.models.model import Model, ModelType, ModelStatus, ModelCapabilities, ModelConfig
         from datetime import datetime
+
+        from eval_hub.models.model import (
+            Model,
+            ModelCapabilities,
+            ModelConfig,
+            ModelStatus,
+            ModelType,
+        )
 
         capabilities = ModelCapabilities(max_tokens=4096, supports_streaming=True)
         config = ModelConfig(temperature=0.5, max_tokens=2000)
@@ -327,7 +321,7 @@ class TestModelDataStructures:
             capabilities=capabilities,
             config=config,
             status=ModelStatus.ACTIVE,
-            tags=["test", "gpt"]
+            tags=["test", "gpt"],
         )
 
         assert model.model_id == "test-gpt-4"
@@ -346,8 +340,9 @@ class TestModelDataStructures:
 
     def test_model_validation_model_id(self):
         """Test Model validation for model_id."""
-        from eval_hub.models.model import Model, ModelType
         import pytest
+
+        from eval_hub.models.model import Model, ModelType
 
         # Test empty model_id
         with pytest.raises(ValueError, match="model_id cannot be empty"):
@@ -356,7 +351,7 @@ class TestModelDataStructures:
                 model_name="Test",
                 description="Test",
                 model_type=ModelType.OPENAI,
-                base_url="https://api.openai.com/v1"
+                base_url="https://api.openai.com/v1",
             )
 
         # Test invalid characters in model_id
@@ -366,28 +361,32 @@ class TestModelDataStructures:
                 model_name="Test",
                 description="Test",
                 model_type=ModelType.OPENAI,
-                base_url="https://api.openai.com/v1"
+                base_url="https://api.openai.com/v1",
             )
 
     def test_model_validation_base_url(self):
         """Test Model validation for base_url."""
-        from eval_hub.models.model import Model, ModelType
         import pytest
 
+        from eval_hub.models.model import Model, ModelType
+
         # Test invalid base_url
-        with pytest.raises(ValueError, match="base_url must be a valid HTTP or HTTPS URL"):
+        with pytest.raises(
+            ValueError, match="base_url must be a valid HTTP or HTTPS URL"
+        ):
             Model(
                 model_id="test-model",
                 model_name="Test",
                 description="Test",
                 model_type=ModelType.OPENAI,
-                base_url="invalid-url"
+                base_url="invalid-url",
             )
 
     def test_model_summary_creation(self):
         """Test ModelSummary creation."""
-        from eval_hub.models.model import ModelSummary, ModelType, ModelStatus
         from datetime import datetime
+
+        from eval_hub.models.model import ModelStatus, ModelSummary, ModelType
 
         summary = ModelSummary(
             model_id="test-model",
@@ -397,7 +396,7 @@ class TestModelDataStructures:
             base_url="https://api.anthropic.com",
             status=ModelStatus.ACTIVE,
             tags=["test"],
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
 
         assert summary.model_id == "test-model"
@@ -407,7 +406,11 @@ class TestModelDataStructures:
 
     def test_model_registration_request(self):
         """Test ModelRegistrationRequest creation."""
-        from eval_hub.models.model import ModelRegistrationRequest, ModelType, ModelCapabilities
+        from eval_hub.models.model import (
+            ModelCapabilities,
+            ModelRegistrationRequest,
+            ModelType,
+        )
 
         capabilities = ModelCapabilities(supports_streaming=True)
 
@@ -418,7 +421,7 @@ class TestModelDataStructures:
             model_type=ModelType.HUGGINGFACE,
             base_url="https://huggingface.co/models/test",
             capabilities=capabilities,
-            tags=["new", "test"]
+            tags=["new", "test"],
         )
 
         assert request.model_id == "new-model"
@@ -429,11 +432,10 @@ class TestModelDataStructures:
 
     def test_model_update_request(self):
         """Test ModelUpdateRequest with optional fields."""
-        from eval_hub.models.model import ModelUpdateRequest, ModelStatus
+        from eval_hub.models.model import ModelStatus, ModelUpdateRequest
 
         request = ModelUpdateRequest(
-            model_name="Updated Model Name",
-            status=ModelStatus.INACTIVE
+            model_name="Updated Model Name", status=ModelStatus.INACTIVE
         )
 
         assert request.model_name == "Updated Model Name"
@@ -442,8 +444,14 @@ class TestModelDataStructures:
 
     def test_list_models_response(self):
         """Test ListModelsResponse creation."""
-        from eval_hub.models.model import ListModelsResponse, ModelSummary, ModelType, ModelStatus
         from datetime import datetime
+
+        from eval_hub.models.model import (
+            ListModelsResponse,
+            ModelStatus,
+            ModelSummary,
+            ModelType,
+        )
 
         summary1 = ModelSummary(
             model_id="model1",
@@ -452,7 +460,7 @@ class TestModelDataStructures:
             model_type=ModelType.OPENAI,
             base_url="https://api.openai.com/v1",
             status=ModelStatus.ACTIVE,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
 
         summary2 = ModelSummary(
@@ -462,13 +470,11 @@ class TestModelDataStructures:
             model_type=ModelType.ANTHROPIC,
             base_url="https://api.anthropic.com",
             status=ModelStatus.ACTIVE,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
 
         response = ListModelsResponse(
-            models=[summary1, summary2],
-            total_models=2,
-            runtime_models=[summary2]
+            models=[summary1, summary2], total_models=2, runtime_models=[summary2]
         )
 
         assert len(response.models) == 2
@@ -478,14 +484,14 @@ class TestModelDataStructures:
 
     def test_runtime_model_config(self):
         """Test RuntimeModelConfig creation."""
-        from eval_hub.models.model import RuntimeModelConfig, ModelType
+        from eval_hub.models.model import ModelType, RuntimeModelConfig
 
         runtime_config = RuntimeModelConfig(
             model_id="runtime-model",
             model_name="Runtime Model",
             base_url="https://localhost:8080",
             model_type=ModelType.VLLM,
-            model_path="/models/test"
+            model_path="/models/test",
         )
 
         assert runtime_config.model_id == "runtime-model"
@@ -495,15 +501,13 @@ class TestModelDataStructures:
 
     def test_model_config_validation_ranges(self):
         """Test ModelConfig validation for parameter ranges."""
-        from eval_hub.models.model import ModelConfig
         import pytest
+
+        from eval_hub.models.model import ModelConfig
 
         # Test valid values
         config = ModelConfig(
-            temperature=0.5,
-            top_p=0.9,
-            frequency_penalty=0.0,
-            presence_penalty=-1.0
+            temperature=0.5, top_p=0.9, frequency_penalty=0.0, presence_penalty=-1.0
         )
         assert config.temperature == 0.5
 

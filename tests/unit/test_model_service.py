@@ -1,21 +1,21 @@
 """Unit tests for the model service."""
 
 import os
-import pytest
-from unittest.mock import patch, Mock
 from datetime import datetime
+from unittest.mock import patch
 
-from eval_hub.services.model_service import ModelService
+import pytest
+
 from eval_hub.models.model import (
-    Model,
-    ModelType,
-    ModelStatus,
+    ListModelsResponse,
     ModelCapabilities,
     ModelConfig,
     ModelRegistrationRequest,
+    ModelStatus,
+    ModelType,
     ModelUpdateRequest,
-    ListModelsResponse,
 )
+from eval_hub.services.model_service import ModelService
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def sample_model_registration():
         capabilities=ModelCapabilities(max_tokens=8192, supports_streaming=True),
         config=ModelConfig(temperature=0.7, max_tokens=2000),
         status=ModelStatus.ACTIVE,
-        tags=["test", "gpt", "openai"]
+        tags=["test", "gpt", "openai"],
     )
 
 
@@ -70,13 +70,17 @@ class TestModelService:
         assert stored_model is not None
         assert stored_model.model_id == "test-gpt-4"
 
-    def test_register_model_duplicate_id(self, model_service, sample_model_registration):
+    def test_register_model_duplicate_id(
+        self, model_service, sample_model_registration
+    ):
         """Test registering model with duplicate ID."""
         # Register first model
         model_service.register_model(sample_model_registration)
 
         # Try to register with same ID
-        with pytest.raises(ValueError, match="Model with ID 'test-gpt-4' already exists"):
+        with pytest.raises(
+            ValueError, match="Model with ID 'test-gpt-4' already exists"
+        ):
             model_service.register_model(sample_model_registration)
 
     def test_get_model_by_id_not_found(self, model_service):
@@ -94,7 +98,7 @@ class TestModelService:
             model_name="Updated GPT-4",
             description="Updated description",
             status=ModelStatus.INACTIVE,
-            tags=["updated", "test"]
+            tags=["updated", "test"],
         )
 
         updated_model = model_service.update_model("test-gpt-4", update_request)
@@ -140,7 +144,9 @@ class TestModelService:
         assert response.total_models == 0
         assert response.runtime_models == []
 
-    def test_get_all_models_with_registered(self, model_service, sample_model_registration):
+    def test_get_all_models_with_registered(
+        self, model_service, sample_model_registration
+    ):
         """Test getting all models with registered models."""
         # Register a model
         model_service.register_model(sample_model_registration)
@@ -151,7 +157,9 @@ class TestModelService:
         assert response.total_models == 1
         assert response.models[0].model_id == "test-gpt-4"
 
-    def test_get_all_models_exclude_inactive(self, model_service, sample_model_registration):
+    def test_get_all_models_exclude_inactive(
+        self, model_service, sample_model_registration
+    ):
         """Test getting all models excluding inactive ones."""
         # Register model and make it inactive
         model_service.register_model(sample_model_registration)
@@ -176,7 +184,7 @@ class TestModelService:
             model_name="Test Claude",
             description="A test Claude model",
             model_type=ModelType.ANTHROPIC,
-            base_url="https://api.anthropic.com/v1"
+            base_url="https://api.anthropic.com/v1",
         )
         model_service.register_model(anthropic_request)
 
@@ -201,7 +209,7 @@ class TestModelService:
             description="An inactive model",
             model_type=ModelType.OPENAI,
             base_url="https://api.openai.com/v1",
-            status=ModelStatus.INACTIVE
+            status=ModelStatus.INACTIVE,
         )
         model_service.register_model(inactive_request)
 
@@ -227,7 +235,7 @@ class TestModelService:
             description="Another model",
             model_type=ModelType.HUGGINGFACE,
             base_url="https://huggingface.co/models/test",
-            tags=["huggingface", "custom"]
+            tags=["huggingface", "custom"],
         )
         model_service.register_model(other_request)
 
@@ -257,7 +265,7 @@ class TestModelService:
             description="An inactive model",
             model_type=ModelType.OPENAI,
             base_url="https://api.openai.com/v1",
-            status=ModelStatus.INACTIVE
+            status=ModelStatus.INACTIVE,
         )
         model_service.register_model(inactive_request)
 
@@ -270,12 +278,15 @@ class TestModelService:
 class TestModelServiceRuntimeModels:
     """Test ModelService runtime model functionality."""
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_GPT4_URL": "https://api.openai.com/v1",
-        "EVAL_HUB_MODEL_GPT4_NAME": "Runtime GPT-4",
-        "EVAL_HUB_MODEL_GPT4_TYPE": "openai",
-        "EVAL_HUB_MODEL_GPT4_PATH": "gpt-4"
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "EVAL_HUB_MODEL_GPT4_URL": "https://api.openai.com/v1",
+            "EVAL_HUB_MODEL_GPT4_NAME": "Runtime GPT-4",
+            "EVAL_HUB_MODEL_GPT4_TYPE": "openai",
+            "EVAL_HUB_MODEL_GPT4_PATH": "gpt-4",
+        },
+    )
     def test_load_runtime_models_from_env(self, model_service):
         """Test loading runtime models from environment variables."""
         # Trigger initialization
@@ -290,10 +301,13 @@ class TestModelServiceRuntimeModels:
         assert runtime_model.model_path == "gpt-4"
         assert "runtime" in runtime_model.tags
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_LOCAL_URL": "http://localhost:8080",
-        # No name, type, or path - should use defaults
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "EVAL_HUB_MODEL_LOCAL_URL": "http://localhost:8080",
+            # No name, type, or path - should use defaults
+        },
+    )
     def test_load_runtime_models_defaults(self, model_service):
         """Test loading runtime models with default values."""
         model_service._initialize()
@@ -305,9 +319,12 @@ class TestModelServiceRuntimeModels:
         assert runtime_model.base_url == "http://localhost:8080"
         assert runtime_model.model_path is None
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_INVALID_URL": "",  # Empty URL should be skipped
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "EVAL_HUB_MODEL_INVALID_URL": "",  # Empty URL should be skipped
+        },
+    )
     def test_load_runtime_models_empty_url(self, model_service):
         """Test that runtime models with empty URLs are skipped."""
         model_service._initialize()
@@ -315,21 +332,24 @@ class TestModelServiceRuntimeModels:
         runtime_model = model_service.get_model_by_id("invalid")
         assert runtime_model is None
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_BADTYPE_URL": "http://localhost:8080",
-        "EVAL_HUB_MODEL_BADTYPE_TYPE": "invalid-type"
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "EVAL_HUB_MODEL_BADTYPE_URL": "http://localhost:8080",
+            "EVAL_HUB_MODEL_BADTYPE_TYPE": "invalid-type",
+        },
+    )
     def test_load_runtime_models_invalid_type(self, model_service):
         """Test runtime models with invalid type use default."""
         model_service._initialize()
 
         runtime_model = model_service.get_model_by_id("badtype")
         assert runtime_model is not None
-        assert runtime_model.model_type == ModelType.OPENAI_COMPATIBLE  # Default fallback
+        assert (
+            runtime_model.model_type == ModelType.OPENAI_COMPATIBLE
+        )  # Default fallback
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_RUNTIME1_URL": "http://localhost:8001"
-    })
+    @patch.dict(os.environ, {"EVAL_HUB_MODEL_RUNTIME1_URL": "http://localhost:8001"})
     def test_cannot_register_model_with_runtime_id(self, model_service):
         """Test that registered models cannot have same ID as runtime models."""
         # Initialize to load runtime models
@@ -341,15 +361,15 @@ class TestModelServiceRuntimeModels:
             model_name="Conflicting Model",
             description="This should fail",
             model_type=ModelType.OPENAI,
-            base_url="https://api.openai.com/v1"
+            base_url="https://api.openai.com/v1",
         )
 
-        with pytest.raises(ValueError, match="Model with ID 'runtime1' is specified as runtime model"):
+        with pytest.raises(
+            ValueError, match="Model with ID 'runtime1' is specified as runtime model"
+        ):
             model_service.register_model(request)
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_RUNTIME2_URL": "http://localhost:8002"
-    })
+    @patch.dict(os.environ, {"EVAL_HUB_MODEL_RUNTIME2_URL": "http://localhost:8002"})
     def test_cannot_update_runtime_model(self, model_service):
         """Test that runtime models cannot be updated."""
         model_service._initialize()
@@ -359,9 +379,7 @@ class TestModelServiceRuntimeModels:
         with pytest.raises(ValueError, match="Cannot update runtime models"):
             model_service.update_model("runtime2", update_request)
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_RUNTIME3_URL": "http://localhost:8003"
-    })
+    @patch.dict(os.environ, {"EVAL_HUB_MODEL_RUNTIME3_URL": "http://localhost:8003"})
     def test_cannot_delete_runtime_model(self, model_service):
         """Test that runtime models cannot be deleted."""
         model_service._initialize()
@@ -369,10 +387,10 @@ class TestModelServiceRuntimeModels:
         with pytest.raises(ValueError, match="Cannot delete runtime models"):
             model_service.delete_model("runtime3")
 
-    @patch.dict(os.environ, {
-        "EVAL_HUB_MODEL_COMBINED_URL": "http://localhost:8004"
-    })
-    def test_get_all_models_includes_runtime(self, model_service, sample_model_registration):
+    @patch.dict(os.environ, {"EVAL_HUB_MODEL_COMBINED_URL": "http://localhost:8004"})
+    def test_get_all_models_includes_runtime(
+        self, model_service, sample_model_registration
+    ):
         """Test that get_all_models includes both registered and runtime models."""
         # Register a model
         model_service.register_model(sample_model_registration)
@@ -387,7 +405,7 @@ class TestModelServiceRuntimeModels:
         # Check that both types are in the models list
         model_ids = [model.model_id for model in response.models]
         assert "test-gpt-4" in model_ids  # Registered model
-        assert "combined" in model_ids   # Runtime model
+        assert "combined" in model_ids  # Runtime model
 
     def test_reload_runtime_models(self, model_service):
         """Test reloading runtime models."""
@@ -396,9 +414,9 @@ class TestModelServiceRuntimeModels:
         initial_count = len(model_service._runtime_models)
 
         # Reload runtime models
-        with patch.dict(os.environ, {
-            "EVAL_HUB_MODEL_NEW_RUNTIME_URL": "http://localhost:9000"
-        }):
+        with patch.dict(
+            os.environ, {"EVAL_HUB_MODEL_NEW_RUNTIME_URL": "http://localhost:9000"}
+        ):
             model_service.reload_runtime_models()
 
         # Check that new runtime model was loaded

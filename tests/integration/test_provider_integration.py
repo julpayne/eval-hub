@@ -1,12 +1,13 @@
 """Integration tests for provider and benchmark endpoints."""
 
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 import yaml
-import tempfile
-import os
-from pathlib import Path
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
 from eval_hub.api.app import create_app
 from eval_hub.core.config import Settings
@@ -33,7 +34,7 @@ def real_providers_yaml():
                         "metrics": ["accuracy", "acc_norm"],
                         "num_few_shot": 10,
                         "dataset_size": 10042,
-                        "tags": ["reasoning", "commonsense", "lm_eval"]
+                        "tags": ["reasoning", "commonsense", "lm_eval"],
                     },
                     {
                         "benchmark_id": "arc_challenge",
@@ -43,7 +44,7 @@ def real_providers_yaml():
                         "metrics": ["accuracy", "acc_norm"],
                         "num_few_shot": 25,
                         "dataset_size": 1172,
-                        "tags": ["knowledge", "science", "lm_eval"]
+                        "tags": ["knowledge", "science", "lm_eval"],
                     },
                     {
                         "benchmark_id": "gsm8k",
@@ -53,7 +54,7 @@ def real_providers_yaml():
                         "metrics": ["exact_match", "accuracy"],
                         "num_few_shot": 5,
                         "dataset_size": 1319,
-                        "tags": ["math", "arithmetic", "lm_eval"]
+                        "tags": ["math", "arithmetic", "lm_eval"],
                     },
                     {
                         "benchmark_id": "truthfulqa",
@@ -63,7 +64,7 @@ def real_providers_yaml():
                         "metrics": ["mc1", "mc2", "bleu", "rouge"],
                         "num_few_shot": 0,
                         "dataset_size": 817,
-                        "tags": ["safety", "truthfulness", "lm_eval"]
+                        "tags": ["safety", "truthfulness", "lm_eval"],
                     },
                     {
                         "benchmark_id": "humaneval",
@@ -73,9 +74,9 @@ def real_providers_yaml():
                         "metrics": ["pass@1", "pass@10", "pass@100"],
                         "num_few_shot": 0,
                         "dataset_size": 164,
-                        "tags": ["code", "programming", "lm_eval"]
-                    }
-                ]
+                        "tags": ["code", "programming", "lm_eval"],
+                    },
+                ],
             },
             {
                 "provider_id": "ragas",
@@ -92,7 +93,7 @@ def real_providers_yaml():
                         "metrics": ["faithfulness_score"],
                         "num_few_shot": 0,
                         "dataset_size": None,
-                        "tags": ["rag", "faithfulness", "factuality"]
+                        "tags": ["rag", "faithfulness", "factuality"],
                     },
                     {
                         "benchmark_id": "answer_relevancy",
@@ -102,9 +103,9 @@ def real_providers_yaml():
                         "metrics": ["answer_relevancy_score"],
                         "num_few_shot": 0,
                         "dataset_size": None,
-                        "tags": ["rag", "relevancy", "quality"]
-                    }
-                ]
+                        "tags": ["rag", "relevancy", "quality"],
+                    },
+                ],
             },
             {
                 "provider_id": "garak",
@@ -121,7 +122,7 @@ def real_providers_yaml():
                         "metrics": ["toxicity_rate", "severity_score"],
                         "num_few_shot": 0,
                         "dataset_size": 500,
-                        "tags": ["safety", "toxicity", "red_team"]
+                        "tags": ["safety", "toxicity", "red_team"],
                     },
                     {
                         "benchmark_id": "bias_detection",
@@ -131,10 +132,10 @@ def real_providers_yaml():
                         "metrics": ["bias_score", "demographic_parity"],
                         "num_few_shot": 0,
                         "dataset_size": 1000,
-                        "tags": ["fairness", "bias", "demographic"]
-                    }
-                ]
-            }
+                        "tags": ["fairness", "bias", "demographic"],
+                    },
+                ],
+            },
         ],
         "collections": [
             {
@@ -142,21 +143,33 @@ def real_providers_yaml():
                 "name": "General LLM Evaluation v1",
                 "description": "Comprehensive general-purpose LLM evaluation suite",
                 "benchmarks": [
-                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "hellaswag"},
-                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "arc_challenge"},
+                    {
+                        "provider_id": "lm_evaluation_harness",
+                        "benchmark_id": "hellaswag",
+                    },
+                    {
+                        "provider_id": "lm_evaluation_harness",
+                        "benchmark_id": "arc_challenge",
+                    },
                     {"provider_id": "lm_evaluation_harness", "benchmark_id": "gsm8k"},
-                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "truthfulqa"}
-                ]
+                    {
+                        "provider_id": "lm_evaluation_harness",
+                        "benchmark_id": "truthfulqa",
+                    },
+                ],
             },
             {
                 "collection_id": "safety_evaluation_v1",
                 "name": "Safety Evaluation v1",
                 "description": "Comprehensive AI safety evaluation suite",
                 "benchmarks": [
-                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "truthfulqa"},
+                    {
+                        "provider_id": "lm_evaluation_harness",
+                        "benchmark_id": "truthfulqa",
+                    },
                     {"provider_id": "garak", "benchmark_id": "toxicity"},
-                    {"provider_id": "garak", "benchmark_id": "bias_detection"}
-                ]
+                    {"provider_id": "garak", "benchmark_id": "bias_detection"},
+                ],
             },
             {
                 "collection_id": "rag_evaluation_v1",
@@ -164,17 +177,17 @@ def real_providers_yaml():
                 "description": "Retrieval Augmented Generation evaluation suite",
                 "benchmarks": [
                     {"provider_id": "ragas", "benchmark_id": "faithfulness"},
-                    {"provider_id": "ragas", "benchmark_id": "answer_relevancy"}
-                ]
-            }
-        ]
+                    {"provider_id": "ragas", "benchmark_id": "answer_relevancy"},
+                ],
+            },
+        ],
     }
 
 
 @pytest.fixture
 def temp_providers_file_integration(real_providers_yaml):
     """Create a temporary providers YAML file for integration testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(real_providers_yaml, f)
         temp_file_path = f.name
 
@@ -187,10 +200,7 @@ def temp_providers_file_integration(real_providers_yaml):
 @pytest.fixture
 def test_settings():
     """Create test settings."""
-    return Settings(
-        debug=True,
-        mlflow_tracking_uri="http://test-mlflow:5000"
-    )
+    return Settings(debug=True, mlflow_tracking_uri="http://test-mlflow:5000")
 
 
 @pytest.fixture
@@ -200,10 +210,14 @@ def integration_client(test_settings, temp_providers_file_integration):
 
     def override_provider_service():
         # Create a fresh provider service with test data
-        with patch.object(ProviderService, '_get_providers_file_path', return_value=Path(temp_providers_file_integration)):
+        with patch.object(
+            ProviderService,
+            "_get_providers_file_path",
+            return_value=Path(temp_providers_file_integration),
+        ):
             return ProviderService(test_settings)
 
-    with patch('eval_hub.core.config.get_settings', return_value=test_settings):
+    with patch("eval_hub.core.config.get_settings", return_value=test_settings):
         app = create_app()
         app.dependency_overrides[get_provider_service] = override_provider_service
         return TestClient(app)
@@ -218,7 +232,7 @@ class TestProviderEndpointsIntegration:
         assert response.status_code == 200
 
         data = response.json()
-        print(f"\n=== DEBUG DATA ===")
+        print("\n=== DEBUG DATA ===")
         print(f"Total providers: {data['total_providers']}")
         print(f"Total benchmarks: {data['total_benchmarks']}")
         print(f"Provider IDs: {[p['provider_id'] for p in data['providers']]}")
@@ -253,17 +267,25 @@ class TestProviderEndpointsIntegration:
         assert response.status_code == 200
 
         benchmarks_data = response.json()
-        assert benchmarks_data["total_count"] == 175  # Real data has 175 total benchmarks
+        assert (
+            benchmarks_data["total_count"] == 175
+        )  # Real data has 175 total benchmarks
         assert len(benchmarks_data["benchmarks"]) == 175
-        assert len(benchmarks_data["providers_included"]) == 3  # Real data has 3 providers
+        assert (
+            len(benchmarks_data["providers_included"]) == 3
+        )  # Real data has 3 providers
 
         # Step 4: Get provider-specific benchmarks
-        response = integration_client.get("/api/v1/providers/lm_evaluation_harness/benchmarks")
+        response = integration_client.get(
+            "/api/v1/providers/lm_evaluation_harness/benchmarks"
+        )
         assert response.status_code == 200
 
         lm_eval_benchmarks = response.json()
         assert len(lm_eval_benchmarks) == 167  # Real data has 167 lm_eval benchmarks
-        assert all(b["provider_id"] == "lm_evaluation_harness" for b in lm_eval_benchmarks)
+        assert all(
+            b["provider_id"] == "lm_evaluation_harness" for b in lm_eval_benchmarks
+        )
 
         # Step 5: List collections
         response = integration_client.get("/api/v1/collections")
@@ -276,12 +298,16 @@ class TestProviderEndpointsIntegration:
     def test_benchmark_filtering_scenarios(self, integration_client):
         """Test various benchmark filtering scenarios."""
         # Test filter by provider
-        response = integration_client.get("/api/v1/benchmarks?provider_id=lm_evaluation_harness")
+        response = integration_client.get(
+            "/api/v1/benchmarks?provider_id=lm_evaluation_harness"
+        )
         assert response.status_code == 200
         data = response.json()
         lm_eval_benchmarks = data["benchmarks"]
         assert len(lm_eval_benchmarks) == 167  # Real data has 167 lm_eval benchmarks
-        assert all(b["provider_id"] == "lm_evaluation_harness" for b in lm_eval_benchmarks)
+        assert all(
+            b["provider_id"] == "lm_evaluation_harness" for b in lm_eval_benchmarks
+        )
 
         # Test filter by category
         response = integration_client.get("/api/v1/benchmarks?category=safety")
@@ -300,7 +326,9 @@ class TestProviderEndpointsIntegration:
         assert all("reasoning" in b["tags"] for b in reasoning_benchmarks)
 
         # Test multiple filters
-        response = integration_client.get("/api/v1/benchmarks?provider_id=garak&category=safety")
+        response = integration_client.get(
+            "/api/v1/benchmarks?provider_id=garak&category=safety"
+        )
         assert response.status_code == 200
         data = response.json()
         filtered_benchmarks = data["benchmarks"]
@@ -316,8 +344,13 @@ class TestProviderEndpointsIntegration:
         categories = set(b["category"] for b in benchmarks)
 
         expected_categories = {
-            "reasoning", "knowledge", "math", "safety",
-            "code", "rag_quality", "fairness"
+            "reasoning",
+            "knowledge",
+            "math",
+            "safety",
+            "code",
+            "rag_quality",
+            "fairness",
         }
         assert expected_categories.issubset(categories)
 
@@ -354,7 +387,7 @@ class TestProviderEndpointsIntegration:
         sizes = [b["dataset_size"] for b in benchmarks if b["dataset_size"] is not None]
         assert len(sizes) > 0
         assert min(sizes) < 1000  # Some small datasets
-        assert max(sizes) > 5000   # Some large datasets
+        assert max(sizes) > 5000  # Some large datasets
 
     def test_collection_integrity(self, integration_client):
         """Test that collections have valid structure and content."""
@@ -391,10 +424,14 @@ class TestProviderEndpointsIntegration:
                 assert "benchmark_id" in bench_ref
 
                 # Check that provider exists (basic sanity check)
-                assert bench_ref["provider_id"] in available_providers, f"Collection references unknown provider: {bench_ref['provider_id']}"
+                assert bench_ref["provider_id"] in available_providers, (
+                    f"Collection references unknown provider: {bench_ref['provider_id']}"
+                )
 
                 # Check benchmark_id is not empty
-                assert bench_ref["benchmark_id"].strip() != "", "Collection has empty benchmark_id"
+                assert bench_ref["benchmark_id"].strip() != "", (
+                    "Collection has empty benchmark_id"
+                )
 
     def test_error_handling_integration(self, integration_client):
         """Test error handling in integration scenarios."""
@@ -453,7 +490,7 @@ class TestProviderEndpointsIntegration:
             "/api/v1/benchmarks",
             "/api/v1/collections",
             "/api/v1/providers/lm_evaluation_harness",
-            "/api/v1/providers/lm_evaluation_harness/benchmarks"
+            "/api/v1/providers/lm_evaluation_harness/benchmarks",
         ]
 
         response_times = []
@@ -471,7 +508,9 @@ class TestProviderEndpointsIntegration:
 
         # Average response time should be reasonable for integration testing with real data
         avg_response_time = sum(response_times) / len(response_times)
-        assert avg_response_time < 0.5, f"Average response time too slow: {avg_response_time}"
+        assert avg_response_time < 0.5, (
+            f"Average response time too slow: {avg_response_time}"
+        )
 
     def test_openapi_schema_integration(self, integration_client):
         """Test that OpenAPI schema is correctly generated."""
@@ -490,7 +529,7 @@ class TestProviderEndpointsIntegration:
             "/api/v1/providers/{provider_id}",
             "/api/v1/benchmarks",
             "/api/v1/providers/{provider_id}/benchmarks",
-            "/api/v1/collections"
+            "/api/v1/collections",
         ]
 
         for expected_path in expected_paths:

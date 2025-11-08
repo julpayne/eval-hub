@@ -1,6 +1,7 @@
 """Main entry point for the evaluation service."""
 
 import uvicorn
+
 from .api.app import create_app
 from .core.config import get_settings
 

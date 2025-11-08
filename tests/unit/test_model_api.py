@@ -1,19 +1,20 @@
 """Unit tests for the model API endpoints."""
 
+from datetime import datetime
+from unittest.mock import Mock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch
-from datetime import datetime
 
 from eval_hub.api.app import create_app
 from eval_hub.models.model import (
+    ListModelsResponse,
     Model,
-    ModelType,
-    ModelStatus,
     ModelCapabilities,
     ModelConfig,
+    ModelStatus,
     ModelSummary,
-    ListModelsResponse,
+    ModelType,
 )
 
 
@@ -45,7 +46,7 @@ def sample_model():
         status=ModelStatus.ACTIVE,
         tags=["test", "gpt", "openai"],
         created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        updated_at=datetime.utcnow(),
     )
 
 
@@ -60,22 +61,22 @@ def sample_model_summary():
         base_url="https://api.openai.com/v1",
         status=ModelStatus.ACTIVE,
         tags=["test", "gpt", "openai"],
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
 
 
 class TestModelAPI:
     """Test model API endpoints."""
 
-    @patch('eval_hub.api.routes.ModelService')
-    def test_list_models_success(self, mock_model_service_class, client, sample_model_summary):
+    @patch("eval_hub.api.routes.ModelService")
+    def test_list_models_success(
+        self, mock_model_service_class, client, sample_model_summary
+    ):
         """Test successful model listing."""
         # Mock the service
         mock_service = Mock()
         mock_service.get_all_models.return_value = ListModelsResponse(
-            models=[sample_model_summary],
-            total_models=1,
-            runtime_models=[]
+            models=[sample_model_summary], total_models=1, runtime_models=[]
         )
         mock_model_service_class.return_value = mock_service
 
@@ -93,15 +94,13 @@ class TestModelAPI:
         # Verify service call
         mock_service.get_all_models.assert_called_once_with(include_inactive=True)
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_list_models_exclude_inactive(self, mock_model_service_class, client):
         """Test model listing excluding inactive models."""
         # Mock the service
         mock_service = Mock()
         mock_service.get_all_models.return_value = ListModelsResponse(
-            models=[],
-            total_models=0,
-            runtime_models=[]
+            models=[], total_models=0, runtime_models=[]
         )
         mock_model_service_class.return_value = mock_service
 
@@ -112,7 +111,7 @@ class TestModelAPI:
         assert response.status_code == 200
         mock_service.get_all_models.assert_called_once_with(include_inactive=False)
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_get_model_success(self, mock_model_service_class, client, sample_model):
         """Test successful model retrieval."""
         # Mock the service
@@ -133,7 +132,7 @@ class TestModelAPI:
         # Verify service call
         mock_service.get_model_by_id.assert_called_once_with("test-gpt-4")
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_get_model_not_found(self, mock_model_service_class, client):
         """Test model retrieval when model doesn't exist."""
         # Mock the service
@@ -149,8 +148,10 @@ class TestModelAPI:
         data = response.json()
         assert "Model non-existent not found" in data["detail"]
 
-    @patch('eval_hub.api.routes.ModelService')
-    def test_register_model_success(self, mock_model_service_class, client, sample_model):
+    @patch("eval_hub.api.routes.ModelService")
+    def test_register_model_success(
+        self, mock_model_service_class, client, sample_model
+    ):
         """Test successful model registration."""
         # Mock the service
         mock_service = Mock()
@@ -170,16 +171,16 @@ class TestModelAPI:
                 "max_tokens": 8192,
                 "supports_streaming": True,
                 "supports_function_calling": False,
-                "supports_vision": False
+                "supports_vision": False,
             },
             "config": {
                 "temperature": 0.7,
                 "max_tokens": 2000,
                 "timeout": 30,
-                "retry_attempts": 3
+                "retry_attempts": 3,
             },
             "status": "active",
-            "tags": ["test", "gpt", "openai"]
+            "tags": ["test", "gpt", "openai"],
         }
 
         # Make request
@@ -194,12 +195,14 @@ class TestModelAPI:
         # Verify service call
         mock_service.register_model.assert_called_once()
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_register_model_duplicate(self, mock_model_service_class, client):
         """Test model registration with duplicate ID."""
         # Mock the service
         mock_service = Mock()
-        mock_service.register_model.side_effect = ValueError("Model with ID 'test-gpt-4' already exists")
+        mock_service.register_model.side_effect = ValueError(
+            "Model with ID 'test-gpt-4' already exists"
+        )
         mock_model_service_class.return_value = mock_service
 
         # Request data
@@ -208,7 +211,7 @@ class TestModelAPI:
             "model_name": "Test GPT-4",
             "description": "A test GPT-4 model",
             "model_type": "openai",
-            "base_url": "https://api.openai.com/v1"
+            "base_url": "https://api.openai.com/v1",
         }
 
         # Make request
@@ -238,7 +241,7 @@ class TestModelAPI:
     #     # Verify response - 422 for validation error or 400 if caught by service validation
     #     assert response.status_code in [400, 422]
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_update_model_success(self, mock_model_service_class, client, sample_model):
         """Test successful model update."""
         # Mock the service
@@ -253,7 +256,7 @@ class TestModelAPI:
         # Request data
         request_data = {
             "model_name": "Updated GPT-4",
-            "description": "Updated description"
+            "description": "Updated description",
         }
 
         # Make request
@@ -290,18 +293,18 @@ class TestModelAPI:
     #     data = response.json()
     #     assert "Model non-existent not found" in data["detail"]
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_update_runtime_model_error(self, mock_model_service_class, client):
         """Test updating runtime model raises error."""
         # Mock the service
         mock_service = Mock()
-        mock_service.update_model.side_effect = ValueError("Cannot update runtime models")
+        mock_service.update_model.side_effect = ValueError(
+            "Cannot update runtime models"
+        )
         mock_model_service_class.return_value = mock_service
 
         # Request data
-        request_data = {
-            "model_name": "Updated Runtime Model"
-        }
+        request_data = {"model_name": "Updated Runtime Model"}
 
         # Make request
         response = client.put("/api/v1/models/runtime-model", json=request_data)
@@ -311,7 +314,7 @@ class TestModelAPI:
         data = response.json()
         assert "Cannot update runtime models" in data["detail"]
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_delete_model_success(self, mock_model_service_class, client):
         """Test successful model deletion."""
         # Mock the service
@@ -347,12 +350,14 @@ class TestModelAPI:
     #     data = response.json()
     #     assert "Model non-existent not found" in data["detail"]
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_delete_runtime_model_error(self, mock_model_service_class, client):
         """Test deleting runtime model raises error."""
         # Mock the service
         mock_service = Mock()
-        mock_service.delete_model.side_effect = ValueError("Cannot delete runtime models")
+        mock_service.delete_model.side_effect = ValueError(
+            "Cannot delete runtime models"
+        )
         mock_model_service_class.return_value = mock_service
 
         # Make request
@@ -363,7 +368,7 @@ class TestModelAPI:
         data = response.json()
         assert "Cannot delete runtime models" in data["detail"]
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_reload_runtime_models_success(self, mock_model_service_class, client):
         """Test successful runtime models reload."""
         # Mock the service
@@ -377,17 +382,22 @@ class TestModelAPI:
         # Verify response
         assert response.status_code == 200
         data = response.json()
-        assert "Runtime models reloaded from environment variables successfully" in data["message"]
+        assert (
+            "Runtime models reloaded from environment variables successfully"
+            in data["message"]
+        )
 
         # Verify service call
         mock_service.reload_runtime_models.assert_called_once()
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_reload_runtime_models_error(self, mock_model_service_class, client):
         """Test runtime models reload with error."""
         # Mock the service
         mock_service = Mock()
-        mock_service.reload_runtime_models.side_effect = Exception("Environment variable error")
+        mock_service.reload_runtime_models.side_effect = Exception(
+            "Environment variable error"
+        )
         mock_model_service_class.return_value = mock_service
 
         # Make request
@@ -402,12 +412,14 @@ class TestModelAPI:
 class TestModelAPIValidation:
     """Test model API validation and edge cases."""
 
-    @patch('eval_hub.api.routes.ModelService')
+    @patch("eval_hub.api.routes.ModelService")
     def test_register_model_invalid_url(self, mock_model_service_class, client):
         """Test model registration with invalid URL."""
         # Mock service to simulate validation error
         mock_service = Mock()
-        mock_service.register_model.side_effect = ValueError("base_url must be a valid HTTP or HTTPS URL")
+        mock_service.register_model.side_effect = ValueError(
+            "base_url must be a valid HTTP or HTTPS URL"
+        )
         mock_model_service_class.return_value = mock_service
 
         request_data = {
@@ -415,7 +427,7 @@ class TestModelAPIValidation:
             "model_name": "Test Model",
             "description": "A test model",
             "model_type": "openai",
-            "base_url": "invalid-url"  # Invalid URL format
+            "base_url": "invalid-url",  # Invalid URL format
         }
 
         response = client.post("/api/v1/models", json=request_data)
@@ -428,7 +440,7 @@ class TestModelAPIValidation:
             "model_name": "Test Model",
             "description": "A test model",
             "model_type": "invalid-type",  # Invalid model type
-            "base_url": "https://api.openai.com/v1"
+            "base_url": "https://api.openai.com/v1",
         }
 
         response = client.post("/api/v1/models", json=request_data)
@@ -438,7 +450,7 @@ class TestModelAPIValidation:
         """Test model registration with missing required fields."""
         request_data = {
             "model_name": "Test Model",
-            "description": "A test model"
+            "description": "A test model",
             # Missing required fields: model_id, model_type, base_url
         }
 

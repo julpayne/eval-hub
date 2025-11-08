@@ -1,17 +1,16 @@
 """Unit tests for request parser service."""
 
 import pytest
-from unittest.mock import Mock
 
 from eval_hub.core.config import Settings
 from eval_hub.core.exceptions import ValidationError
 from eval_hub.models.evaluation import (
+    BackendSpec,
+    BackendType,
+    BenchmarkSpec,
     EvaluationRequest,
     EvaluationSpec,
-    BackendSpec,
-    BenchmarkSpec,
     RiskCategory,
-    BackendType,
 )
 from eval_hub.services.parser import RequestParser
 
@@ -24,36 +23,49 @@ def settings():
             "lm-evaluation-harness": {
                 "image": "eval-harness:latest",
                 "resources": {"cpu": "2", "memory": "4Gi"},
-                "timeout": 3600
+                "timeout": 3600,
             },
             "guidellm": {
                 "image": "guidellm:latest",
                 "resources": {"cpu": "1", "memory": "2Gi"},
-                "timeout": 1800
-            }
+                "timeout": 1800,
+            },
         },
         risk_category_benchmarks={
             "low": {
                 "benchmarks": ["hellaswag", "arc_easy"],
                 "num_fewshot": 5,
-                "limit": 100
+                "limit": 100,
             },
             "medium": {
                 "benchmarks": ["hellaswag", "arc_easy", "arc_challenge", "winogrande"],
                 "num_fewshot": 5,
-                "limit": 500
+                "limit": 500,
             },
             "high": {
-                "benchmarks": ["hellaswag", "arc_easy", "arc_challenge", "winogrande", "mmlu"],
+                "benchmarks": [
+                    "hellaswag",
+                    "arc_easy",
+                    "arc_challenge",
+                    "winogrande",
+                    "mmlu",
+                ],
                 "num_fewshot": 5,
-                "limit": 1000
+                "limit": 1000,
             },
             "critical": {
-                "benchmarks": ["hellaswag", "arc_easy", "arc_challenge", "winogrande", "mmlu", "gsm8k"],
+                "benchmarks": [
+                    "hellaswag",
+                    "arc_easy",
+                    "arc_challenge",
+                    "winogrande",
+                    "mmlu",
+                    "gsm8k",
+                ],
                 "num_fewshot": 5,
-                "limit": None
-            }
-        }
+                "limit": None,
+            },
+        },
     )
 
 
@@ -70,20 +82,15 @@ class TestRequestParser:
     async def test_parse_valid_request_with_backends(self, parser):
         """Test parsing a valid request with explicit backends."""
         benchmark = BenchmarkSpec(
-            name="hellaswag",
-            tasks=["hellaswag"],
-            num_fewshot=5,
-            limit=1000
+            name="hellaswag", tasks=["hellaswag"], num_fewshot=5, limit=1000
         )
         backend = BackendSpec(
             name="lm-evaluation-harness",
             type=BackendType.LMEVAL,
-            benchmarks=[benchmark]
+            benchmarks=[benchmark],
         )
         eval_spec = EvaluationSpec(
-            name="Test Evaluation",
-            model_name="test-model",
-            backends=[backend]
+            name="Test Evaluation", model_name="test-model", backends=[backend]
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -101,7 +108,7 @@ class TestRequestParser:
         eval_spec = EvaluationSpec(
             name="Risk Category Test",
             model_name="test-model",
-            risk_category=RiskCategory.MEDIUM
+            risk_category=RiskCategory.MEDIUM,
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -121,7 +128,12 @@ class TestRequestParser:
         # Check benchmarks for medium risk category
         for backend in evaluation.backends:
             benchmark_names = [b.name for b in backend.benchmarks]
-            expected_benchmarks = ["hellaswag", "arc_easy", "arc_challenge", "winogrande"]
+            expected_benchmarks = [
+                "hellaswag",
+                "arc_easy",
+                "arc_challenge",
+                "winogrande",
+            ]
             for expected in expected_benchmarks:
                 assert expected in benchmark_names
 
@@ -131,7 +143,7 @@ class TestRequestParser:
         eval_spec = EvaluationSpec(
             name="Low Risk Test",
             model_name="test-model",
-            risk_category=RiskCategory.LOW
+            risk_category=RiskCategory.LOW,
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -153,7 +165,7 @@ class TestRequestParser:
         eval_spec = EvaluationSpec(
             name="Critical Risk Test",
             model_name="test-model",
-            risk_category=RiskCategory.CRITICAL
+            risk_category=RiskCategory.CRITICAL,
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -164,7 +176,14 @@ class TestRequestParser:
         # Check benchmarks for critical risk category
         for backend in evaluation.backends:
             benchmark_names = [b.name for b in backend.benchmarks]
-            expected_benchmarks = ["hellaswag", "arc_easy", "arc_challenge", "winogrande", "mmlu", "gsm8k"]
+            expected_benchmarks = [
+                "hellaswag",
+                "arc_easy",
+                "arc_challenge",
+                "winogrande",
+                "mmlu",
+                "gsm8k",
+            ]
             assert len(benchmark_names) == len(expected_benchmarks)
             for expected in expected_benchmarks:
                 assert expected in benchmark_names
@@ -187,7 +206,7 @@ class TestRequestParser:
             eval_spec = EvaluationSpec(
                 name=f"Test {i}",
                 model_name="test-model",
-                risk_category=RiskCategory.LOW
+                risk_category=RiskCategory.LOW,
             )
             evaluations.append(eval_spec)
 
@@ -204,7 +223,7 @@ class TestRequestParser:
         eval_spec = EvaluationSpec(
             name="Test",
             model_name="",  # Empty model name
-            risk_category=RiskCategory.LOW
+            risk_category=RiskCategory.LOW,
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -218,7 +237,7 @@ class TestRequestParser:
         """Test validation fails when neither backends nor risk category specified."""
         eval_spec = EvaluationSpec(
             name="Test",
-            model_name="test-model"
+            model_name="test-model",
             # No backends or risk_category
         )
         request = EvaluationRequest(evaluations=[eval_spec])
@@ -235,7 +254,7 @@ class TestRequestParser:
             name="Test",
             model_name="test-model",
             risk_category=RiskCategory.LOW,
-            timeout_minutes=-1
+            timeout_minutes=-1,
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -251,7 +270,7 @@ class TestRequestParser:
             name="Test",
             model_name="test-model",
             risk_category=RiskCategory.LOW,
-            retry_attempts=-1
+            retry_attempts=-1,
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -265,14 +284,12 @@ class TestRequestParser:
         """Test validation fails for empty backend name."""
         benchmark = BenchmarkSpec(name="test", tasks=["test"])
         backend = BackendSpec(
-            name="",  # Empty name
+            name="",
             type=BackendType.CUSTOM,
-            benchmarks=[benchmark]
+            benchmarks=[benchmark],  # Empty name
         )
         eval_spec = EvaluationSpec(
-            name="Test",
-            model_name="test-model",
-            backends=[backend]
+            name="Test", model_name="test-model", backends=[backend]
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -287,12 +304,10 @@ class TestRequestParser:
         backend = BackendSpec(
             name="test-backend",
             type=BackendType.CUSTOM,
-            benchmarks=[]  # Empty benchmarks
+            benchmarks=[],  # Empty benchmarks
         )
         eval_spec = EvaluationSpec(
-            name="Test",
-            model_name="test-model",
-            backends=[backend]
+            name="Test", model_name="test-model", backends=[backend]
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -308,12 +323,10 @@ class TestRequestParser:
         backend = BackendSpec(
             name="lm-evaluation-harness",
             type=BackendType.LMEVAL,
-            benchmarks=[benchmark]
+            benchmarks=[benchmark],
         )
         eval_spec = EvaluationSpec(
-            name="Test",
-            model_name="test-model",
-            backends=[backend]
+            name="Test", model_name="test-model", backends=[backend]
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -340,18 +353,14 @@ class TestRequestParser:
         backend1 = BackendSpec(
             name="backend1",
             type=BackendType.CUSTOM,
-            benchmarks=[benchmark1, benchmark2]
+            benchmarks=[benchmark1, benchmark2],
         )
         backend2 = BackendSpec(
-            name="backend2",
-            type=BackendType.CUSTOM,
-            benchmarks=[benchmark3]
+            name="backend2", type=BackendType.CUSTOM, benchmarks=[benchmark3]
         )
 
         eval_spec = EvaluationSpec(
-            name="Test",
-            model_name="test-model",
-            backends=[backend1, backend2]
+            name="Test", model_name="test-model", backends=[backend1, backend2]
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 
@@ -362,14 +371,10 @@ class TestRequestParser:
         """Test completion time estimation."""
         benchmark = BenchmarkSpec(name="test", tasks=["test"])
         backend = BackendSpec(
-            name="test-backend",
-            type=BackendType.CUSTOM,
-            benchmarks=[benchmark]
+            name="test-backend", type=BackendType.CUSTOM, benchmarks=[benchmark]
         )
         eval_spec = EvaluationSpec(
-            name="Test",
-            model_name="test-model",
-            backends=[backend]
+            name="Test", model_name="test-model", backends=[backend]
         )
         request = EvaluationRequest(evaluations=[eval_spec])
 

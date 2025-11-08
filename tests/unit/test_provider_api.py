@@ -1,25 +1,23 @@
 """Unit tests for provider and benchmark API endpoints."""
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from fastapi.testclient import TestClient
-from fastapi import HTTPException, status
-import yaml
-from pathlib import Path
 
 from eval_hub.api.app import create_app
-from eval_hub.services.provider_service import ProviderService
 from eval_hub.models.provider import (
-    Provider,
-    ProviderSummary,
     Benchmark,
-    Collection,
     BenchmarkDetail,
-    ListProvidersResponse,
+    Collection,
     ListBenchmarksResponse,
     ListCollectionsResponse,
+    ListProvidersResponse,
+    Provider,
+    ProviderSummary,
     ProviderType,
 )
+from eval_hub.services.provider_service import ProviderService
 
 
 @pytest.fixture
@@ -42,7 +40,7 @@ def mock_provider_data():
                         "metrics": ["accuracy", "f1_score"],
                         "num_few_shot": 5,
                         "dataset_size": 1000,
-                        "tags": ["test", "reasoning"]
+                        "tags": ["test", "reasoning"],
                     },
                     {
                         "benchmark_id": "test_benchmark_2",
@@ -52,9 +50,9 @@ def mock_provider_data():
                         "metrics": ["exact_match"],
                         "num_few_shot": 0,
                         "dataset_size": 500,
-                        "tags": ["test", "math"]
-                    }
-                ]
+                        "tags": ["test", "math"],
+                    },
+                ],
             },
             {
                 "provider_id": "lm_evaluation_harness",
@@ -71,10 +69,10 @@ def mock_provider_data():
                         "metrics": ["accuracy", "acc_norm"],
                         "num_few_shot": 10,
                         "dataset_size": 10042,
-                        "tags": ["reasoning", "commonsense"]
+                        "tags": ["reasoning", "commonsense"],
                     }
-                ]
-            }
+                ],
+            },
         ],
         "collections": [
             {
@@ -82,11 +80,17 @@ def mock_provider_data():
                 "name": "Test Collection",
                 "description": "A test benchmark collection",
                 "benchmarks": [
-                    {"provider_id": "test_provider", "benchmark_id": "test_benchmark_1"},
-                    {"provider_id": "lm_evaluation_harness", "benchmark_id": "hellaswag"}
-                ]
+                    {
+                        "provider_id": "test_provider",
+                        "benchmark_id": "test_benchmark_1",
+                    },
+                    {
+                        "provider_id": "lm_evaluation_harness",
+                        "benchmark_id": "hellaswag",
+                    },
+                ],
             }
-        ]
+        ],
     }
 
 
@@ -119,7 +123,7 @@ def mock_provider_service(mock_provider_data):
                 dataset_size=bench_data["dataset_size"],
                 tags=bench_data["tags"],
                 provider_type=provider_data["provider_type"],
-                base_url=provider_data["base_url"]
+                base_url=provider_data["base_url"],
             )
             all_benchmarks.append(benchmark_detail)
 
@@ -129,12 +133,14 @@ def mock_provider_service(mock_provider_data):
             description=provider_data["description"],
             provider_type=ProviderType(provider_data["provider_type"]),
             base_url=provider_data["base_url"],
-            benchmarks=benchmarks
+            benchmarks=benchmarks,
         )
         providers.append(provider)
 
     # Mock collections
-    collections = [Collection(**col_data) for col_data in mock_provider_data["collections"]]
+    collections = [
+        Collection(**col_data) for col_data in mock_provider_data["collections"]
+    ]
 
     # Set up mock return values
     service.get_all_providers.return_value = ListProvidersResponse(
@@ -145,11 +151,12 @@ def mock_provider_service(mock_provider_data):
                 description=p.description,
                 provider_type=p.provider_type,
                 base_url=p.base_url,
-                benchmark_count=len(p.benchmarks)
-            ) for p in providers
+                benchmark_count=len(p.benchmarks),
+            )
+            for p in providers
         ],
         total_providers=len(providers),
-        total_benchmarks=len(all_benchmarks)
+        total_benchmarks=len(all_benchmarks),
     )
 
     service.get_all_benchmarks.return_value = ListBenchmarksResponse(
@@ -163,16 +170,16 @@ def mock_provider_service(mock_provider_data):
                 "metrics": b.metrics,
                 "num_few_shot": b.num_few_shot,
                 "dataset_size": b.dataset_size,
-                "tags": b.tags
-            } for b in all_benchmarks
+                "tags": b.tags,
+            }
+            for b in all_benchmarks
         ],
         total_count=len(all_benchmarks),
-        providers_included=[p.provider_id for p in providers]
+        providers_included=[p.provider_id for p in providers],
     )
 
     service.get_all_collections.return_value = ListCollectionsResponse(
-        collections=collections,
-        total_collections=len(collections)
+        collections=collections, total_collections=len(collections)
     )
 
     service.get_provider_by_id.side_effect = lambda provider_id: next(
@@ -184,7 +191,8 @@ def mock_provider_service(mock_provider_data):
     ]
 
     service.search_benchmarks.side_effect = lambda **filters: [
-        b for b in all_benchmarks
+        b
+        for b in all_benchmarks
         if (not filters.get("provider_id") or b.provider_id == filters["provider_id"])
         and (not filters.get("category") or b.category == filters["category"])
         and (not filters.get("tags") or any(tag in b.tags for tag in filters["tags"]))
@@ -232,15 +240,16 @@ class TestProviderAPI:
         assert len(providers) == 2
 
         # Verify first provider
-        test_provider = next(p for p in providers if p["provider_id"] == "test_provider")
+        test_provider = next(
+            p for p in providers if p["provider_id"] == "test_provider"
+        )
         assert test_provider["provider_name"] == "Test Provider"
         assert test_provider["description"] == "A test provider"
         assert test_provider["provider_type"] == "nemo-evaluator"
         assert test_provider["base_url"] == "http://test-provider:8080"
         assert test_provider["benchmark_count"] == 2
 
-    
-    def test_get_provider_success(self,  client_with_mock_provider):
+    def test_get_provider_success(self, client_with_mock_provider):
         """Test successful retrieval of specific provider."""
         client, mock_service = client_with_mock_provider
 
@@ -257,8 +266,7 @@ class TestProviderAPI:
         assert "benchmarks" in data
         assert len(data["benchmarks"]) == 2
 
-    
-    def test_get_provider_not_found(self,  client_with_mock_provider):
+    def test_get_provider_not_found(self, client_with_mock_provider):
         """Test getting non-existent provider."""
         client, mock_service = client_with_mock_provider
 
@@ -268,8 +276,7 @@ class TestProviderAPI:
         data = response.json()
         assert "not found" in data["detail"].lower()
 
-    
-    def test_list_all_benchmarks_success(self,  client_with_mock_provider):
+    def test_list_all_benchmarks_success(self, client_with_mock_provider):
         """Test successful listing of all benchmarks."""
         client, mock_service = client_with_mock_provider
 
@@ -285,14 +292,16 @@ class TestProviderAPI:
         assert len(data["benchmarks"]) == 3
         assert len(data["providers_included"]) == 2
 
-    
-    def test_list_benchmarks_with_provider_filter(self,  client_with_mock_provider):
+    def test_list_benchmarks_with_provider_filter(self, client_with_mock_provider):
         """Test listing benchmarks filtered by provider."""
         client, mock_service = client_with_mock_provider
 
         # Mock search_benchmarks to return filtered results
-        filtered_benchmarks = [b for b in mock_service.get_all_benchmarks().benchmarks
-                             if b["provider_id"] == "test_provider"]
+        filtered_benchmarks = [
+            b
+            for b in mock_service.get_all_benchmarks().benchmarks
+            if b["provider_id"] == "test_provider"
+        ]
         mock_service.search_benchmarks.return_value = [
             BenchmarkDetail(
                 benchmark_id=b["benchmark_id"],
@@ -306,8 +315,9 @@ class TestProviderAPI:
                 dataset_size=b["dataset_size"],
                 tags=b["tags"],
                 provider_type="nemo-evaluator",
-                base_url="http://test-provider:8080"
-            ) for b in filtered_benchmarks
+                base_url="http://test-provider:8080",
+            )
+            for b in filtered_benchmarks
         ]
 
         response = client.get("/api/v1/benchmarks?provider_id=test_provider")
@@ -319,14 +329,16 @@ class TestProviderAPI:
         benchmarks = data["benchmarks"]
         assert all(b["provider_id"] == "test_provider" for b in benchmarks)
 
-    
-    def test_list_benchmarks_with_category_filter(self,  client_with_mock_provider):
+    def test_list_benchmarks_with_category_filter(self, client_with_mock_provider):
         """Test listing benchmarks filtered by category."""
         client, mock_service = client_with_mock_provider
 
         # Mock search_benchmarks to return filtered results
-        filtered_benchmarks = [b for b in mock_service.get_all_benchmarks().benchmarks
-                             if b["category"] == "reasoning"]
+        filtered_benchmarks = [
+            b
+            for b in mock_service.get_all_benchmarks().benchmarks
+            if b["category"] == "reasoning"
+        ]
         mock_service.search_benchmarks.return_value = [
             BenchmarkDetail(
                 benchmark_id=b["benchmark_id"],
@@ -340,8 +352,9 @@ class TestProviderAPI:
                 dataset_size=b["dataset_size"],
                 tags=b["tags"],
                 provider_type="nemo-evaluator",
-                base_url="http://test-provider:8080"
-            ) for b in filtered_benchmarks
+                base_url="http://test-provider:8080",
+            )
+            for b in filtered_benchmarks
         ]
 
         response = client.get("/api/v1/benchmarks?category=reasoning")
@@ -353,14 +366,16 @@ class TestProviderAPI:
         benchmarks = data["benchmarks"]
         assert all(b["category"] == "reasoning" for b in benchmarks)
 
-    
-    def test_list_benchmarks_with_tags_filter(self,  client_with_mock_provider):
+    def test_list_benchmarks_with_tags_filter(self, client_with_mock_provider):
         """Test listing benchmarks filtered by tags."""
         client, mock_service = client_with_mock_provider
 
         # Mock search_benchmarks to return filtered results for 'test' tag
-        filtered_benchmarks = [b for b in mock_service.get_all_benchmarks().benchmarks
-                             if "test" in b["tags"]]
+        filtered_benchmarks = [
+            b
+            for b in mock_service.get_all_benchmarks().benchmarks
+            if "test" in b["tags"]
+        ]
         mock_service.search_benchmarks.return_value = [
             BenchmarkDetail(
                 benchmark_id=b["benchmark_id"],
@@ -374,8 +389,9 @@ class TestProviderAPI:
                 dataset_size=b["dataset_size"],
                 tags=b["tags"],
                 provider_type="nemo-evaluator",
-                base_url="http://test-provider:8080"
-            ) for b in filtered_benchmarks
+                base_url="http://test-provider:8080",
+            )
+            for b in filtered_benchmarks
         ]
 
         response = client.get("/api/v1/benchmarks?tags=test")
@@ -387,8 +403,7 @@ class TestProviderAPI:
         benchmarks = data["benchmarks"]
         assert all("test" in b["tags"] for b in benchmarks)
 
-    
-    def test_get_benchmarks_by_provider_success(self,  client_with_mock_provider):
+    def test_get_benchmarks_by_provider_success(self, client_with_mock_provider):
         """Test successful retrieval of provider-specific benchmarks."""
         client, mock_service = client_with_mock_provider
 
@@ -401,8 +416,7 @@ class TestProviderAPI:
         assert len(data) == 2
         assert all(b["provider_id"] == "test_provider" for b in data)
 
-    
-    def test_get_benchmarks_by_provider_not_found(self,  client_with_mock_provider):
+    def test_get_benchmarks_by_provider_not_found(self, client_with_mock_provider):
         """Test getting benchmarks for non-existent provider."""
         client, mock_service = client_with_mock_provider
 
@@ -415,8 +429,7 @@ class TestProviderAPI:
         data = response.json()
         assert "not found" in data["detail"].lower()
 
-    
-    def test_list_collections_success(self,  client_with_mock_provider):
+    def test_list_collections_success(self, client_with_mock_provider):
         """Test successful listing of collections."""
         client, mock_service = client_with_mock_provider
 
@@ -443,7 +456,9 @@ class TestProviderServiceIntegration:
         """Test provider service error handling."""
         from eval_hub.core.config import Settings
 
-        with patch('eval_hub.services.provider_service.ProviderService._load_providers_data') as mock_load:
+        with patch(
+            "eval_hub.services.provider_service.ProviderService._load_providers_data"
+        ) as mock_load:
             mock_load.side_effect = FileNotFoundError("providers.yaml not found")
 
             settings = Settings()
@@ -455,14 +470,12 @@ class TestProviderServiceIntegration:
         """Test benchmark filtering logic."""
         # Test with multiple filters
         result = mock_provider_service.search_benchmarks(
-            provider_id="test_provider",
-            category="reasoning"
+            provider_id="test_provider", category="reasoning"
         )
 
         # Should call search_benchmarks with proper filters
         mock_provider_service.search_benchmarks.assert_called_with(
-            provider_id="test_provider",
-            category="reasoning"
+            provider_id="test_provider", category="reasoning"
         )
 
     def test_response_model_validation(self, mock_provider_data):
@@ -475,7 +488,7 @@ class TestProviderServiceIntegration:
             description=provider_data["description"],
             provider_type=ProviderType(provider_data["provider_type"]),
             base_url=provider_data["base_url"],
-            benchmarks=[Benchmark(**b) for b in provider_data["benchmarks"]]
+            benchmarks=[Benchmark(**b) for b in provider_data["benchmarks"]],
         )
 
         assert provider.provider_id == "test_provider"
@@ -484,23 +497,24 @@ class TestProviderServiceIntegration:
 
         # Test ListProvidersResponse model validation
         providers_response = ListProvidersResponse(
-            providers=[ProviderSummary(
-                provider_id=provider.provider_id,
-                provider_name=provider.provider_name,
-                description=provider.description,
-                provider_type=provider.provider_type,
-                base_url=provider.base_url,
-                benchmark_count=len(provider.benchmarks)
-            )],
+            providers=[
+                ProviderSummary(
+                    provider_id=provider.provider_id,
+                    provider_name=provider.provider_name,
+                    description=provider.description,
+                    provider_type=provider.provider_type,
+                    base_url=provider.base_url,
+                    benchmark_count=len(provider.benchmarks),
+                )
+            ],
             total_providers=1,
-            total_benchmarks=2
+            total_benchmarks=2,
         )
 
         assert providers_response.total_providers == 1
         assert providers_response.total_benchmarks == 2
 
-    
-    def test_api_error_responses(self,  client_with_mock_provider):
+    def test_api_error_responses(self, client_with_mock_provider):
         """Test API error response formats."""
         client, mock_service = client_with_mock_provider
 
@@ -515,7 +529,6 @@ class TestProviderServiceIntegration:
     def test_concurrent_access_handling(self, mock_provider_service):
         """Test that provider service handles concurrent access properly."""
         import threading
-        import time
 
         results = []
 
@@ -545,29 +558,31 @@ class TestProviderServiceIntegration:
 class TestAPIValidation:
     """Test API input validation and error handling."""
 
-    
-    def test_invalid_provider_id_format(self,  client_with_mock_provider):
+    def test_invalid_provider_id_format(self, client_with_mock_provider):
         """Test handling of invalid provider ID format."""
         client, mock_service = client_with_mock_provider
 
         # Test with special characters that might cause issues
-        invalid_ids = ["provider/with/slashes", "provider with spaces", "provider%with%percent"]
+        invalid_ids = [
+            "provider/with/slashes",
+            "provider with spaces",
+            "provider%with%percent",
+        ]
 
         for invalid_id in invalid_ids:
             response = client.get(f"/api/v1/providers/{invalid_id}")
             # Should handle gracefully (either 404 or proper encoding)
             assert response.status_code in [200, 404]
 
-    
-    def test_query_parameter_validation(self,  client_with_mock_provider):
+    def test_query_parameter_validation(self, client_with_mock_provider):
         """Test query parameter validation."""
         client, mock_service = client_with_mock_provider
 
         # Test with various query parameter values
         test_cases = [
             "/api/v1/benchmarks?provider_id=",  # Empty provider_id
-            "/api/v1/benchmarks?category=",     # Empty category
-            "/api/v1/benchmarks?tags=",         # Empty tags
+            "/api/v1/benchmarks?category=",  # Empty category
+            "/api/v1/benchmarks?tags=",  # Empty tags
             "/api/v1/benchmarks?invalid_param=test",  # Invalid parameter
         ]
 
@@ -583,23 +598,25 @@ class TestAPIValidation:
         # Create a large number of mock benchmarks for the response
         large_benchmark_list = []
         for i in range(100):  # Use 100 instead of 1000 to keep test faster
-            large_benchmark_list.append({
-                "benchmark_id": f"benchmark_{i}",
-                "provider_id": "test_provider",
-                "name": f"Test Benchmark {i}",
-                "description": f"Benchmark number {i}",
-                "category": "test",
-                "metrics": ["accuracy"],
-                "num_few_shot": 0,
-                "dataset_size": 100,
-                "tags": ["test"]
-            })
+            large_benchmark_list.append(
+                {
+                    "benchmark_id": f"benchmark_{i}",
+                    "provider_id": "test_provider",
+                    "name": f"Test Benchmark {i}",
+                    "description": f"Benchmark number {i}",
+                    "category": "test",
+                    "metrics": ["accuracy"],
+                    "num_few_shot": 0,
+                    "dataset_size": 100,
+                    "tags": ["test"],
+                }
+            )
 
         # Mock the service to return large response
         mock_service.get_all_benchmarks.return_value = ListBenchmarksResponse(
             benchmarks=large_benchmark_list,
             total_count=100,
-            providers_included=["test_provider"]
+            providers_included=["test_provider"],
         )
 
         # Test API can handle large response

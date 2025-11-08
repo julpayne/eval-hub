@@ -3,27 +3,40 @@
 import asyncio
 import time
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from fastapi.responses import JSONResponse
 
 from ..core.config import Settings, get_settings
 from ..core.exceptions import ValidationError
 from ..core.logging import get_logger
 from ..models.evaluation import (
+    BackendSpec,
+    BackendType,
+    BenchmarkSpec,
     EvaluationRequest,
     EvaluationResponse,
     EvaluationResult,
     EvaluationSpec,
     SingleBenchmarkEvaluationRequest,
-    BackendSpec,
-    BenchmarkSpec,
-    BackendType,
 )
-from ..models.provider import ProviderType
 from ..models.health import HealthResponse
+from ..models.model import (
+    ListModelServersResponse,
+    ModelServer,
+    ModelServerRegistrationRequest,
+    ModelServerUpdateRequest,
+)
 from ..models.provider import (
     BenchmarkDetail,
     Collection,
@@ -31,16 +44,7 @@ from ..models.provider import (
     ListCollectionsResponse,
     ListProvidersResponse,
     Provider,
-)
-from ..models.model import (
-    Model,
-    ModelRegistrationRequest,
-    ModelUpdateRequest,
-    ListModelsResponse,
-    ModelServer,
-    ModelServerRegistrationRequest,
-    ModelServerUpdateRequest,
-    ListModelServersResponse,
+    ProviderType,
 )
 from ..services.executor import EvaluationExecutor
 from ..services.mlflow_client import MLFlowClient
@@ -87,7 +91,7 @@ def get_response_builder(settings: Settings = Depends(get_settings)) -> Response
 
 def get_provider_service(request: Request) -> ProviderService:
     """Dependency to get provider service from app state (loaded at startup)."""
-    if not hasattr(request.app.state, 'provider_service'):
+    if not hasattr(request.app.state, "provider_service"):
         settings = get_settings()
         provider_service = ProviderService(settings)
         provider_service.initialize()
@@ -187,7 +191,8 @@ async def create_single_benchmark_evaluation(
     # Create full evaluation request
     evaluation_request = EvaluationRequest(
         request_id=uuid4(),
-        experiment_name=request.experiment_name or f"Single Benchmark - {benchmark.name}",
+        experiment_name=request.experiment_name
+        or f"Single Benchmark - {benchmark.name}",
         tags={
             **request.tags,
             "benchmark_id": f"{provider_id}::{benchmark_id}",
@@ -427,7 +432,7 @@ async def list_evaluations(
     limit: int = Query(
         50, ge=1, le=100, description="Maximum number of evaluations to return"
     ),
-    status_filter: Optional[str] = Query(None, description="Filter by status"),
+    status_filter: str | None = Query(None, description="Filter by status"),
 ) -> list[EvaluationResponse]:
     """List all evaluation requests."""
     evaluations = list(active_evaluations.values())
@@ -577,9 +582,9 @@ async def get_provider(
 
 @router.get("/benchmarks", response_model=ListBenchmarksResponse)
 async def list_all_benchmarks(
-    provider_id: Optional[str] = Query(None, description="Filter by provider ID"),
-    category: Optional[str] = Query(None, description="Filter by benchmark category"),
-    tags: Optional[str] = Query(None, description="Filter by tags (comma-separated)"),
+    provider_id: str | None = Query(None, description="Filter by provider ID"),
+    category: str | None = Query(None, description="Filter by benchmark category"),
+    tags: str | None = Query(None, description="Filter by tags (comma-separated)"),
     provider_service: ProviderService = Depends(get_provider_service),
 ) -> ListBenchmarksResponse:
     """List all available benchmarks across providers (similar to Llama Stack format)."""
@@ -745,7 +750,9 @@ async def get_server(
     return server
 
 
-@router.post("/servers", response_model=ModelServer, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/servers", response_model=ModelServer, status_code=status.HTTP_201_CREATED
+)
 async def register_server(
     request: ModelServerRegistrationRequest,
     model_service: ModelService = Depends(get_model_service),

@@ -1,8 +1,7 @@
 """Application configuration."""
 
-import os
 from functools import lru_cache
-from typing import Dict, Any, Optional
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,10 +11,7 @@ class Settings(BaseSettings):
     """Application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="allow"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="allow"
     )
 
     # Application settings
@@ -33,70 +29,99 @@ class Settings(BaseSettings):
     openapi_url: str = Field(default="/openapi.json", description="OpenAPI schema URL")
 
     # Security
-    secret_key: str = Field(default="your-secret-key-change-in-production", description="Secret key for JWT")
-    access_token_expire_minutes: int = Field(default=30, description="Access token expiration")
+    secret_key: str = Field(
+        default="your-secret-key-change-in-production", description="Secret key for JWT"
+    )
+    access_token_expire_minutes: int = Field(
+        default=30, description="Access token expiration"
+    )
 
     # Database settings
-    database_url: Optional[str] = Field(default=None, description="Database connection URL")
+    database_url: str | None = Field(
+        default=None, description="Database connection URL"
+    )
 
     # MLFlow settings
-    mlflow_tracking_uri: str = Field(default="http://localhost:5000", description="MLFlow tracking server URI")
-    mlflow_experiment_prefix: str = Field(default="eval-hub", description="MLFlow experiment name prefix")
-    mlflow_artifact_location: Optional[str] = Field(default=None, description="MLFlow artifact storage location")
+    mlflow_tracking_uri: str = Field(
+        default="http://localhost:5000", description="MLFlow tracking server URI"
+    )
+    mlflow_experiment_prefix: str = Field(
+        default="eval-hub", description="MLFlow experiment name prefix"
+    )
+    mlflow_artifact_location: str | None = Field(
+        default=None, description="MLFlow artifact storage location"
+    )
 
     # S3/Object Storage (for MLFlow artifacts)
-    s3_endpoint_url: Optional[str] = Field(default=None, description="S3 endpoint URL")
-    s3_access_key_id: Optional[str] = Field(default=None, description="S3 access key")
-    s3_secret_access_key: Optional[str] = Field(default=None, description="S3 secret key")
-    s3_bucket_name: Optional[str] = Field(default=None, description="S3 bucket name")
+    s3_endpoint_url: str | None = Field(default=None, description="S3 endpoint URL")
+    s3_access_key_id: str | None = Field(default=None, description="S3 access key")
+    s3_secret_access_key: str | None = Field(default=None, description="S3 secret key")
+    s3_bucket_name: str | None = Field(default=None, description="S3 bucket name")
 
     # Evaluation settings
-    max_concurrent_evaluations: int = Field(default=10, description="Maximum concurrent evaluations")
-    default_timeout_minutes: int = Field(default=60, description="Default evaluation timeout")
+    max_concurrent_evaluations: int = Field(
+        default=10, description="Maximum concurrent evaluations"
+    )
+    default_timeout_minutes: int = Field(
+        default=60, description="Default evaluation timeout"
+    )
     max_retry_attempts: int = Field(default=3, description="Maximum retry attempts")
 
     # Backend configurations
-    backend_configs: Dict[str, Dict[str, Any]] = Field(
+    backend_configs: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: {
             "lm-evaluation-harness": {
                 "image": "eval-harness:latest",
                 "resources": {"cpu": "2", "memory": "4Gi"},
-                "timeout": 3600
+                "timeout": 3600,
             },
             "guidellm": {
                 "image": "guidellm:latest",
                 "resources": {"cpu": "1", "memory": "2Gi"},
-                "timeout": 1800
-            }
+                "timeout": 1800,
+            },
         },
-        description="Backend-specific configurations"
+        description="Backend-specific configurations",
     )
 
     # Risk category benchmark mappings
-    risk_category_benchmarks: Dict[str, Dict[str, Any]] = Field(
+    risk_category_benchmarks: dict[str, dict[str, Any]] = Field(
         default_factory=lambda: {
             "low": {
                 "benchmarks": ["hellaswag", "arc_easy"],
                 "num_fewshot": 5,
-                "limit": 100
+                "limit": 100,
             },
             "medium": {
                 "benchmarks": ["hellaswag", "arc_easy", "arc_challenge", "winogrande"],
                 "num_fewshot": 5,
-                "limit": 500
+                "limit": 500,
             },
             "high": {
-                "benchmarks": ["hellaswag", "arc_easy", "arc_challenge", "winogrande", "mmlu"],
+                "benchmarks": [
+                    "hellaswag",
+                    "arc_easy",
+                    "arc_challenge",
+                    "winogrande",
+                    "mmlu",
+                ],
                 "num_fewshot": 5,
-                "limit": 1000
+                "limit": 1000,
             },
             "critical": {
-                "benchmarks": ["hellaswag", "arc_easy", "arc_challenge", "winogrande", "mmlu", "gsm8k"],
+                "benchmarks": [
+                    "hellaswag",
+                    "arc_easy",
+                    "arc_challenge",
+                    "winogrande",
+                    "mmlu",
+                    "gsm8k",
+                ],
                 "num_fewshot": 5,
-                "limit": None
-            }
+                "limit": None,
+            },
         },
-        description="Risk category to benchmark mappings"
+        description="Risk category to benchmark mappings",
     )
 
     # Monitoring settings
@@ -105,11 +130,17 @@ class Settings(BaseSettings):
 
     # OpenShift/Kubernetes settings
     namespace: str = Field(default="default", description="Kubernetes namespace")
-    service_account: Optional[str] = Field(default=None, description="Service account name")
+    service_account: str | None = Field(
+        default=None, description="Service account name"
+    )
 
     # Callback settings
-    callback_timeout_seconds: int = Field(default=30, description="Callback request timeout")
-    callback_retry_attempts: int = Field(default=3, description="Callback retry attempts")
+    callback_timeout_seconds: int = Field(
+        default=30, description="Callback request timeout"
+    )
+    callback_retry_attempts: int = Field(
+        default=3, description="Callback retry attempts"
+    )
 
     @property
     def database_url_sync(self) -> str:
@@ -126,7 +157,7 @@ class Settings(BaseSettings):
         return "sqlite+aiosqlite:///./eval_hub.db"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Get cached application settings."""
     return Settings()

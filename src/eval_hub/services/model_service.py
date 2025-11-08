@@ -3,26 +3,17 @@
 import os
 import re
 from datetime import datetime
-from typing import Dict, List, Optional, Union, Tuple
+
 from ..core.config import Settings
 from ..core.logging import get_logger
 from ..models.model import (
-    Model,
-    ModelSummary,
-    ModelType,
-    ModelStatus,
-    ModelCapabilities,
-    ModelConfig,
-    ModelRegistrationRequest,
-    ModelUpdateRequest,
-    ListModelsResponse,
-    RuntimeModelConfig,
-    ModelsData,
-    ModelServer,
-    ModelServerSummary,
-    ModelServerRegistrationRequest,
-    ModelServerUpdateRequest,
     ListModelServersResponse,
+    ModelServer,
+    ModelServerRegistrationRequest,
+    ModelServerSummary,
+    ModelServerUpdateRequest,
+    ModelStatus,
+    ModelType,
     ServerModel,
 )
 
@@ -34,8 +25,8 @@ class ModelService:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._registered_servers: Dict[str, ModelServer] = {}
-        self._runtime_servers: Dict[str, ModelServer] = {}
+        self._registered_servers: dict[str, ModelServer] = {}
+        self._runtime_servers: dict[str, ModelServer] = {}
         self._initialized = False
 
     def _initialize(self) -> None:
@@ -48,7 +39,7 @@ class ModelService:
         logger.info(
             "Model service initialized",
             registered_servers=len(self._registered_servers),
-            runtime_servers=len(self._runtime_servers)
+            runtime_servers=len(self._runtime_servers),
         )
 
     def _load_runtime_servers(self) -> None:
@@ -82,18 +73,24 @@ class ModelService:
                     )
                     server_type = ModelType.OPENAI_COMPATIBLE
 
-                model_names = [m.strip() for m in models_str.split(",") if m.strip()] if models_str else []
+                model_names = (
+                    [m.strip() for m in models_str.split(",") if m.strip()]
+                    if models_str
+                    else []
+                )
                 if not model_names:
                     model_names = [server_id]
 
                 server_models = []
                 for model_name in model_names:
-                    server_models.append(ServerModel(
-                        model_name=model_name,
-                        description=None,
-                        status=ModelStatus.ACTIVE,
-                        tags=["runtime"]
-                    ))
+                    server_models.append(
+                        ServerModel(
+                            model_name=model_name,
+                            description=None,
+                            status=ModelStatus.ACTIVE,
+                            tags=["runtime"],
+                        )
+                    )
 
                 runtime_server = ModelServer(
                     server_id=server_id,
@@ -104,7 +101,7 @@ class ModelService:
                     status=ModelStatus.ACTIVE,
                     tags=["runtime"],
                     created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.utcnow(),
                 )
 
                 runtime_servers[server_id] = runtime_server
@@ -113,13 +110,15 @@ class ModelService:
                     server_id=server_id,
                     server_type=server_type.value,
                     base_url=model_server_url,
-                    model_count=len(server_models)
+                    model_count=len(server_models),
                 )
 
         # New pattern: EVAL_HUB_MODEL_SERVER_<SERVER_ID>_URL
         for env_var, env_value in os.environ.items():
-            if env_var.startswith("EVAL_HUB_MODEL_SERVER_") and env_var.endswith("_URL"):
-                match = re.match(r'EVAL_HUB_MODEL_SERVER_(.+)_URL', env_var)
+            if env_var.startswith("EVAL_HUB_MODEL_SERVER_") and env_var.endswith(
+                "_URL"
+            ):
+                match = re.match(r"EVAL_HUB_MODEL_SERVER_(.+)_URL", env_var)
                 if not match:
                     continue
 
@@ -127,7 +126,9 @@ class ModelService:
                 base_url = env_value.strip()
 
                 if not base_url:
-                    logger.warning(f"Empty URL for runtime server {server_id}, skipping")
+                    logger.warning(
+                        f"Empty URL for runtime server {server_id}, skipping"
+                    )
                     continue
 
                 # Get optional configuration
@@ -151,8 +152,12 @@ class ModelService:
                     server_type = ModelType.OPENAI_COMPATIBLE
 
                 # Parse model names (comma-separated)
-                model_names = [m.strip() for m in models_str.split(",") if m.strip()] if models_str else []
-                
+                model_names = (
+                    [m.strip() for m in models_str.split(",") if m.strip()]
+                    if models_str
+                    else []
+                )
+
                 # If no models specified, create a default model with the server_id
                 if not model_names:
                     model_names = [server_id]
@@ -160,12 +165,14 @@ class ModelService:
                 # Create ServerModel objects
                 server_models = []
                 for model_name in model_names:
-                    server_models.append(ServerModel(
-                        model_name=model_name,
-                        description=None,
-                        status=ModelStatus.ACTIVE,
-                        tags=["runtime"]
-                    ))
+                    server_models.append(
+                        ServerModel(
+                            model_name=model_name,
+                            description=None,
+                            status=ModelStatus.ACTIVE,
+                            tags=["runtime"],
+                        )
+                    )
 
                 # Create runtime server
                 runtime_server = ModelServer(
@@ -177,7 +184,7 @@ class ModelService:
                     status=ModelStatus.ACTIVE,
                     tags=["runtime"],
                     created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.utcnow(),
                 )
 
                 runtime_servers[server_id] = runtime_server
@@ -186,18 +193,22 @@ class ModelService:
                     server_id=server_id,
                     server_type=server_type.value,
                     base_url=base_url,
-                    model_count=len(server_models)
+                    model_count=len(server_models),
                 )
 
         # Backward compatibility: EVAL_HUB_MODEL_<ID>_URL creates a server with a single model
         for env_var, env_value in os.environ.items():
-            if env_var.startswith("EVAL_HUB_MODEL_") and env_var.endswith("_URL") and "SERVER" not in env_var:
-                match = re.match(r'EVAL_HUB_MODEL_(.+)_URL', env_var)
+            if (
+                env_var.startswith("EVAL_HUB_MODEL_")
+                and env_var.endswith("_URL")
+                and "SERVER" not in env_var
+            ):
+                match = re.match(r"EVAL_HUB_MODEL_(.+)_URL", env_var)
                 if not match:
                     continue
 
                 server_id = match.group(1).lower()
-                
+
                 # Skip if already processed as a server
                 if server_id in runtime_servers:
                     continue
@@ -224,23 +235,25 @@ class ModelService:
                     server_type=server_type,
                     base_url=base_url,
                     api_key_required=True,
-                    models=[ServerModel(
-                        model_name=server_id,
-                        description=None,
-                        status=ModelStatus.ACTIVE,
-                        tags=["runtime"]
-                    )],
+                    models=[
+                        ServerModel(
+                            model_name=server_id,
+                            description=None,
+                            status=ModelStatus.ACTIVE,
+                            tags=["runtime"],
+                        )
+                    ],
                     status=ModelStatus.ACTIVE,
                     tags=["runtime"],
                     created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.utcnow(),
                 )
 
                 runtime_servers[server_id] = runtime_server
                 logger.info(
                     "Loaded runtime server from legacy environment variable",
                     server_id=server_id,
-                    base_url=base_url
+                    base_url=base_url,
                 )
 
         self._runtime_servers = runtime_servers
@@ -254,7 +267,9 @@ class ModelService:
             raise ValueError(f"Server with ID '{request.server_id}' already exists")
 
         if request.server_id in self._runtime_servers:
-            raise ValueError(f"Server with ID '{request.server_id}' is specified as runtime server via environment variable")
+            raise ValueError(
+                f"Server with ID '{request.server_id}' is specified as runtime server via environment variable"
+            )
 
         # Create the server
         now = datetime.utcnow()
@@ -268,7 +283,7 @@ class ModelService:
             status=request.status,
             tags=request.tags,
             created_at=now,
-            updated_at=now
+            updated_at=now,
         )
 
         self._registered_servers[request.server_id] = server
@@ -277,12 +292,12 @@ class ModelService:
             "Model server registered successfully",
             server_id=request.server_id,
             server_type=request.server_type.value,
-            model_count=len(server.models)
+            model_count=len(server.models),
         )
 
         return server
 
-    def get_server_by_id(self, server_id: str) -> Optional[ModelServer]:
+    def get_server_by_id(self, server_id: str) -> ModelServer | None:
         """Get a server by ID (from either registered or runtime servers)."""
         self._initialize()
 
@@ -296,7 +311,9 @@ class ModelService:
 
         return None
 
-    def get_model_on_server(self, server_id: str, model_name: str) -> Optional[Tuple[ModelServer, ServerModel]]:
+    def get_model_on_server(
+        self, server_id: str, model_name: str
+    ) -> tuple[ModelServer, ServerModel] | None:
         """Get a specific model on a server. Returns (server, model) tuple if found."""
         self._initialize()
 
@@ -311,7 +328,9 @@ class ModelService:
 
         return None
 
-    def get_all_servers(self, include_inactive: bool = True) -> ListModelServersResponse:
+    def get_all_servers(
+        self, include_inactive: bool = True
+    ) -> ListModelServersResponse:
         """Get all model servers (registered and runtime)."""
         self._initialize()
 
@@ -326,7 +345,7 @@ class ModelService:
                     model_count=len(server.models),
                     status=server.status,
                     tags=server.tags,
-                    created_at=server.created_at
+                    created_at=server.created_at,
                 )
                 registered_summaries.append(summary)
 
@@ -340,7 +359,7 @@ class ModelService:
                 model_count=len(server.models),
                 status=server.status,
                 tags=server.tags,
-                created_at=server.created_at
+                created_at=server.created_at,
             )
             runtime_summaries.append(summary)
 
@@ -350,15 +369,19 @@ class ModelService:
         return ListModelServersResponse(
             servers=all_summaries,
             total_servers=len(all_summaries),
-            runtime_servers=runtime_summaries
+            runtime_servers=runtime_summaries,
         )
 
-    def update_server(self, server_id: str, request: ModelServerUpdateRequest) -> Optional[ModelServer]:
+    def update_server(
+        self, server_id: str, request: ModelServerUpdateRequest
+    ) -> ModelServer | None:
         """Update an existing registered server."""
         self._initialize()
 
         if server_id in self._runtime_servers:
-            raise ValueError("Cannot update runtime servers specified via environment variables")
+            raise ValueError(
+                "Cannot update runtime servers specified via environment variables"
+            )
 
         if server_id not in self._registered_servers:
             return None
@@ -381,10 +404,7 @@ class ModelService:
 
         server.updated_at = datetime.utcnow()
 
-        logger.info(
-            "Server updated successfully",
-            server_id=server_id
-        )
+        logger.info("Server updated successfully", server_id=server_id)
 
         return server
 
@@ -393,7 +413,9 @@ class ModelService:
         self._initialize()
 
         if server_id in self._runtime_servers:
-            raise ValueError("Cannot delete runtime servers specified via environment variables")
+            raise ValueError(
+                "Cannot delete runtime servers specified via environment variables"
+            )
 
         if server_id in self._registered_servers:
             del self._registered_servers[server_id]

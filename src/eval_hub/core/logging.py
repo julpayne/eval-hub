@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 from structlog.typing import FilteringBoundLogger
@@ -28,7 +28,11 @@ def setup_logging(settings: Settings) -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.dev.set_exc_info,
             structlog.processors.TimeStamper(fmt="ISO"),
-            structlog.dev.ConsoleRenderer() if settings.debug else structlog.processors.JSONRenderer(),
+            (
+                structlog.dev.ConsoleRenderer()
+                if settings.debug
+                else structlog.processors.JSONRenderer()
+            ),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(
             getattr(logging, settings.log_level.upper())
@@ -48,7 +52,7 @@ def log_request_start(
     request_id: str,
     endpoint: str,
     method: str,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> None:
     """Log the start of a request."""
     logger.info(
@@ -56,7 +60,7 @@ def log_request_start(
         request_id=request_id,
         endpoint=endpoint,
         method=method,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -65,7 +69,7 @@ def log_request_end(
     request_id: str,
     status_code: int,
     duration_ms: float,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> None:
     """Log the end of a request."""
     logger.info(
@@ -73,7 +77,7 @@ def log_request_end(
         request_id=request_id,
         status_code=status_code,
         duration_ms=duration_ms,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -82,7 +86,7 @@ def log_evaluation_start(
     evaluation_id: str,
     model_name: str,
     backend_count: int,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> None:
     """Log the start of an evaluation."""
     logger.info(
@@ -90,7 +94,7 @@ def log_evaluation_start(
         evaluation_id=evaluation_id,
         model_name=model_name,
         backend_count=backend_count,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -99,7 +103,7 @@ def log_evaluation_complete(
     evaluation_id: str,
     status: str,
     duration_seconds: float,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> None:
     """Log the completion of an evaluation."""
     logger.info(
@@ -107,5 +111,5 @@ def log_evaluation_complete(
         evaluation_id=evaluation_id,
         status=status,
         duration_seconds=duration_seconds,
-        **kwargs
+        **kwargs,
     )

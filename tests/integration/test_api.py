@@ -1,9 +1,9 @@
 """Integration tests for the API endpoints."""
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch
-import json
 
 from eval_hub.api.app import create_app
 from eval_hub.core.config import Settings
@@ -19,23 +19,19 @@ def test_settings():
             "lm-evaluation-harness": {
                 "image": "eval-harness:test",
                 "resources": {"cpu": "1", "memory": "2Gi"},
-                "timeout": 1800
+                "timeout": 1800,
             }
         },
         risk_category_benchmarks={
-            "low": {
-                "benchmarks": ["hellaswag"],
-                "num_fewshot": 5,
-                "limit": 100
-            }
-        }
+            "low": {"benchmarks": ["hellaswag"], "num_fewshot": 5, "limit": 100}
+        },
     )
 
 
 @pytest.fixture
 def client(test_settings):
     """Create test client."""
-    with patch('eval_hub.core.config.get_settings', return_value=test_settings):
+    with patch("eval_hub.core.config.get_settings", return_value=test_settings):
         app = create_app()
         return TestClient(app)
 
@@ -63,17 +59,20 @@ class TestAPIEndpoints:
                 {
                     "name": "Test Evaluation",
                     "model_name": "test-model",
-                    "risk_category": "low"
+                    "risk_category": "low",
                 }
             ]
         }
 
-        with patch('eval_hub.services.mlflow_client.MLFlowClient.create_experiment', return_value="test-exp-1"):
-            with patch('eval_hub.services.mlflow_client.MLFlowClient.get_experiment_url', return_value="http://test-mlflow:5000/#/experiments/1"):
-                response = client.post(
-                    "/api/v1/evaluations",
-                    json=request_data
-                )
+        with patch(
+            "eval_hub.services.mlflow_client.MLFlowClient.create_experiment",
+            return_value="test-exp-1",
+        ):
+            with patch(
+                "eval_hub.services.mlflow_client.MLFlowClient.get_experiment_url",
+                return_value="http://test-mlflow:5000/#/experiments/1",
+            ):
+                response = client.post("/api/v1/evaluations", json=request_data)
 
         assert response.status_code == 202
         data = response.json()
@@ -99,21 +98,24 @@ class TestAPIEndpoints:
                                     "name": "hellaswag",
                                     "tasks": ["hellaswag"],
                                     "num_fewshot": 5,
-                                    "limit": 100
+                                    "limit": 100,
                                 }
-                            ]
+                            ],
                         }
-                    ]
+                    ],
                 }
             ]
         }
 
-        with patch('eval_hub.services.mlflow_client.MLFlowClient.create_experiment', return_value="test-exp-2"):
-            with patch('eval_hub.services.mlflow_client.MLFlowClient.get_experiment_url', return_value="http://test-mlflow:5000/#/experiments/2"):
-                response = client.post(
-                    "/api/v1/evaluations",
-                    json=request_data
-                )
+        with patch(
+            "eval_hub.services.mlflow_client.MLFlowClient.create_experiment",
+            return_value="test-exp-2",
+        ):
+            with patch(
+                "eval_hub.services.mlflow_client.MLFlowClient.get_experiment_url",
+                return_value="http://test-mlflow:5000/#/experiments/2",
+            ):
+                response = client.post("/api/v1/evaluations", json=request_data)
 
         assert response.status_code == 202
         data = response.json()
@@ -128,15 +130,12 @@ class TestAPIEndpoints:
                 {
                     "name": "Invalid Test",
                     "model_name": "",  # Empty model name should fail validation
-                    "risk_category": "low"
+                    "risk_category": "low",
                 }
             ]
         }
 
-        response = client.post(
-            "/api/v1/evaluations",
-            json=request_data
-        )
+        response = client.post("/api/v1/evaluations", json=request_data)
 
         assert response.status_code == 400
         data = response.json()
@@ -237,18 +236,26 @@ class TestAPIEndpoints:
                 {
                     "name": "Sync Test",
                     "model_name": "test-model",
-                    "risk_category": "low"
+                    "risk_category": "low",
                 }
             ]
         }
 
-        with patch('eval_hub.services.mlflow_client.MLFlowClient.create_experiment', return_value="test-exp-sync"):
-            with patch('eval_hub.services.mlflow_client.MLFlowClient.get_experiment_url', return_value="http://test-mlflow:5000/#/experiments/sync"):
-                with patch('eval_hub.services.executor.EvaluationExecutor.execute_evaluation_request', return_value=[]):
+        with patch(
+            "eval_hub.services.mlflow_client.MLFlowClient.create_experiment",
+            return_value="test-exp-sync",
+        ):
+            with patch(
+                "eval_hub.services.mlflow_client.MLFlowClient.get_experiment_url",
+                return_value="http://test-mlflow:5000/#/experiments/sync",
+            ):
+                with patch(
+                    "eval_hub.services.executor.EvaluationExecutor.execute_evaluation_request",
+                    return_value=[],
+                ):
                     # Test synchronous mode
                     response = client.post(
-                        "/api/v1/evaluations?async_mode=false",
-                        json=request_data
+                        "/api/v1/evaluations?async_mode=false", json=request_data
                     )
 
         assert response.status_code == 202
@@ -267,7 +274,7 @@ class TestAPIEndpoints:
         response = client.post(
             "/api/v1/evaluations",
             data="invalid json",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         assert response.status_code == 422  # Unprocessable Entity
@@ -283,9 +290,6 @@ class TestAPIEndpoints:
             ]
         }
 
-        response = client.post(
-            "/api/v1/evaluations",
-            json=request_data
-        )
+        response = client.post("/api/v1/evaluations", json=request_data)
 
         assert response.status_code == 422  # Validation error

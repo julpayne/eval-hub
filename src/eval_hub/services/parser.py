@@ -1,18 +1,15 @@
 """Request parser service for evaluation specifications."""
 
-from typing import Dict, List, Any, Optional
-from uuid import UUID
-
 from ..core.config import Settings
 from ..core.exceptions import ValidationError
 from ..core.logging import get_logger
 from ..models.evaluation import (
+    BackendSpec,
+    BackendType,
+    BenchmarkSpec,
     EvaluationRequest,
     EvaluationSpec,
-    BackendSpec,
-    BenchmarkSpec,
     RiskCategory,
-    BackendType,
 )
 
 
@@ -23,12 +20,14 @@ class RequestParser:
         self.settings = settings
         self.logger = get_logger(__name__)
 
-    async def parse_evaluation_request(self, request: EvaluationRequest) -> EvaluationRequest:
+    async def parse_evaluation_request(
+        self, request: EvaluationRequest
+    ) -> EvaluationRequest:
         """Parse and validate an evaluation request."""
         self.logger.info(
             "Parsing evaluation request",
             request_id=str(request.request_id),
-            evaluation_count=len(request.evaluations)
+            evaluation_count=len(request.evaluations),
         )
 
         # Validate the request
@@ -47,7 +46,7 @@ class RequestParser:
         self.logger.info(
             "Successfully parsed evaluation request",
             request_id=str(request.request_id),
-            total_backends=sum(len(spec.backends) for spec in processed_evaluations)
+            total_backends=sum(len(spec.backends) for spec in processed_evaluations),
         )
 
         return processed_request
@@ -64,7 +63,9 @@ class RequestParser:
         for i, eval_spec in enumerate(request.evaluations):
             await self._validate_evaluation_spec(eval_spec, f"evaluations[{i}]")
 
-    async def _validate_evaluation_spec(self, spec: EvaluationSpec, context: str) -> None:
+    async def _validate_evaluation_spec(
+        self, spec: EvaluationSpec, context: str
+    ) -> None:
         """Validate a single evaluation specification."""
         if not spec.model_server_id:
             raise ValidationError(f"{context}: model_server_id is required")
@@ -72,7 +73,9 @@ class RequestParser:
             raise ValidationError(f"{context}: model_name is required")
 
         if not spec.backends and not spec.risk_category:
-            raise ValidationError(f"{context}: must specify either backends or risk_category")
+            raise ValidationError(
+                f"{context}: must specify either backends or risk_category"
+            )
 
         if spec.timeout_minutes <= 0:
             raise ValidationError(f"{context}: timeout_minutes must be positive")
@@ -95,7 +98,10 @@ class RequestParser:
 
         # Check if backend type is supported
         supported_backends = self.settings.backend_configs.keys()
-        if backend.type not in [BackendType.CUSTOM] and backend.name not in supported_backends:
+        if (
+            backend.type not in [BackendType.CUSTOM]
+            and backend.name not in supported_backends
+        ):
             raise ValidationError(
                 f"{context}: unsupported backend '{backend.name}'. "
                 f"Supported backends: {list(supported_backends)}"
@@ -105,7 +111,9 @@ class RequestParser:
         for k, benchmark in enumerate(backend.benchmarks):
             await self._validate_benchmark_spec(benchmark, f"{context}.benchmarks[{k}]")
 
-    async def _validate_benchmark_spec(self, benchmark: BenchmarkSpec, context: str) -> None:
+    async def _validate_benchmark_spec(
+        self, benchmark: BenchmarkSpec, context: str
+    ) -> None:
         """Validate a benchmark specification."""
         if not benchmark.name:
             raise ValidationError(f"{context}: name is required")
@@ -131,7 +139,7 @@ class RequestParser:
             self.logger.info(
                 "Generating backends from risk category",
                 evaluation_id=str(spec.id),
-                risk_category=spec.risk_category
+                risk_category=spec.risk_category,
             )
             processed_spec.backends = await self._generate_backends_from_risk_category(
                 spec.risk_category, spec.model_name
@@ -145,11 +153,13 @@ class RequestParser:
 
     async def _generate_backends_from_risk_category(
         self, risk_category: RiskCategory, model_name: str
-    ) -> List[BackendSpec]:
+    ) -> list[BackendSpec]:
         """Generate backend specifications based on risk category."""
         risk_config = self.settings.risk_category_benchmarks.get(risk_category.value)
         if not risk_config:
-            raise ValidationError(f"No configuration found for risk category: {risk_category}")
+            raise ValidationError(
+                f"No configuration found for risk category: {risk_category}"
+            )
 
         backends = []
 
@@ -160,19 +170,25 @@ class RequestParser:
             for benchmark_name in risk_config["benchmarks"]:
                 benchmark = BenchmarkSpec(
                     name=benchmark_name,
-                    tasks=[benchmark_name],  # Simplified - each benchmark is a single task
+                    tasks=[
+                        benchmark_name
+                    ],  # Simplified - each benchmark is a single task
                     num_fewshot=risk_config.get("num_fewshot"),
                     limit=risk_config.get("limit"),
-                    config={}
+                    config={},
                 )
                 benchmarks.append(benchmark)
 
             # Create backend spec
             backend = BackendSpec(
                 name=backend_name,
-                type=BackendType.LMEVAL if "lm-evaluation" in backend_name else BackendType.GUIDELLM,
+                type=(
+                    BackendType.LMEVAL
+                    if "lm-evaluation" in backend_name
+                    else BackendType.GUIDELLM
+                ),
                 benchmarks=benchmarks,
-                config=backend_config.copy()
+                config=backend_config.copy(),
             )
             backends.append(backend)
 
@@ -180,7 +196,7 @@ class RequestParser:
                 "Generated backend from risk category",
                 backend_name=backend_name,
                 risk_category=risk_category,
-                benchmark_count=len(benchmarks)
+                benchmark_count=len(benchmarks),
             )
 
         return backends
@@ -199,7 +215,9 @@ class RequestParser:
         for benchmark in backend.benchmarks:
             await self._apply_benchmark_defaults(benchmark, backend.name)
 
-    async def _apply_benchmark_defaults(self, benchmark: BenchmarkSpec, backend_name: str) -> None:
+    async def _apply_benchmark_defaults(
+        self, benchmark: BenchmarkSpec, backend_name: str
+    ) -> None:
         """Apply default configurations to a benchmark specification."""
         # Set default batch size if not specified
         if benchmark.batch_size is None:

@@ -1,36 +1,40 @@
 """Unit tests for the provider service."""
 
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 import yaml
-import tempfile
-import os
-from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
 
-from eval_hub.services.provider_service import ProviderService
 from eval_hub.models.provider import (
-    Provider,
-    ProviderSummary,
     Benchmark,
-    Collection,
     BenchmarkDetail,
-    ListProvidersResponse,
     ListBenchmarksResponse,
     ListCollectionsResponse,
-    ProviderType,
+    ListProvidersResponse,
+    Provider,
     ProvidersData,
+    ProviderType,
 )
+from eval_hub.services.provider_service import ProviderService
 
 
 def create_provider_service_with_test_data(temp_file_path):
     """Helper function to create ProviderService with test data."""
-    from eval_hub.core.config import Settings
     from contextlib import contextmanager
+
+    from eval_hub.core.config import Settings
 
     @contextmanager
     def _service_context():
         settings = Settings()
-        with patch.object(ProviderService, '_get_providers_file_path', return_value=Path(temp_file_path)):
+        with patch.object(
+            ProviderService,
+            "_get_providers_file_path",
+            return_value=Path(temp_file_path),
+        ):
             yield ProviderService(settings)
 
     return _service_context()
@@ -56,7 +60,7 @@ def sample_providers_yaml():
                         "metrics": ["accuracy", "f1_score"],
                         "num_few_shot": 5,
                         "dataset_size": 1000,
-                        "tags": ["reasoning", "test"]
+                        "tags": ["reasoning", "test"],
                     },
                     {
                         "benchmark_id": "benchmark_1b",
@@ -66,9 +70,9 @@ def sample_providers_yaml():
                         "metrics": ["exact_match"],
                         "num_few_shot": 0,
                         "dataset_size": 500,
-                        "tags": ["math", "test"]
-                    }
-                ]
+                        "tags": ["math", "test"],
+                    },
+                ],
             },
             {
                 "provider_id": "test_provider_2",
@@ -85,10 +89,10 @@ def sample_providers_yaml():
                         "metrics": ["toxicity_rate"],
                         "num_few_shot": 0,
                         "dataset_size": 200,
-                        "tags": ["safety", "test"]
+                        "tags": ["safety", "test"],
                     }
-                ]
-            }
+                ],
+            },
         ],
         "collections": [
             {
@@ -97,8 +101,8 @@ def sample_providers_yaml():
                 "description": "First test collection",
                 "benchmarks": [
                     {"provider_id": "test_provider_1", "benchmark_id": "benchmark_1a"},
-                    {"provider_id": "test_provider_2", "benchmark_id": "benchmark_2a"}
-                ]
+                    {"provider_id": "test_provider_2", "benchmark_id": "benchmark_2a"},
+                ],
             },
             {
                 "collection_id": "test_collection_2",
@@ -106,16 +110,16 @@ def sample_providers_yaml():
                 "description": "Second test collection",
                 "benchmarks": [
                     {"provider_id": "test_provider_1", "benchmark_id": "benchmark_1b"}
-                ]
-            }
-        ]
+                ],
+            },
+        ],
     }
 
 
 @pytest.fixture
 def temp_providers_file(sample_providers_yaml):
     """Create a temporary providers YAML file for testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(sample_providers_yaml, f)
         temp_file_path = f.name
 
@@ -133,16 +137,20 @@ class TestProviderService:
         with create_provider_service_with_test_data(temp_providers_file) as service:
             assert service is not None
             # Verify internal data is loaded
-            assert hasattr(service, '_providers_data')
-            assert hasattr(service, '_providers_by_id')
-            assert hasattr(service, '_benchmarks_by_id')
+            assert hasattr(service, "_providers_data")
+            assert hasattr(service, "_providers_by_id")
+            assert hasattr(service, "_benchmarks_by_id")
 
     def test_init_with_missing_file(self):
         """Test initialization when providers file is missing."""
         from eval_hub.core.config import Settings
 
         settings = Settings()
-        with patch.object(ProviderService, '_get_providers_file_path', side_effect=FileNotFoundError("Providers file not found")):
+        with patch.object(
+            ProviderService,
+            "_get_providers_file_path",
+            side_effect=FileNotFoundError("Providers file not found"),
+        ):
             service = ProviderService(settings)
             with pytest.raises(FileNotFoundError):
                 service.get_all_providers()  # This triggers the data loading
@@ -151,13 +159,17 @@ class TestProviderService:
         """Test initialization with invalid YAML file."""
         from eval_hub.core.config import Settings
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("invalid: yaml: content: [")
             invalid_file_path = f.name
 
         try:
             settings = Settings()
-            with patch.object(ProviderService, '_get_providers_file_path', return_value=Path(invalid_file_path)):
+            with patch.object(
+                ProviderService,
+                "_get_providers_file_path",
+                return_value=Path(invalid_file_path),
+            ):
                 service = ProviderService(settings)
                 with pytest.raises(yaml.YAMLError):
                     service.get_all_providers()  # This triggers the data loading
@@ -180,10 +192,14 @@ class TestProviderService:
             assert "test_provider_2" in provider_ids
 
             # Check benchmark counts
-            provider_1 = next(p for p in result.providers if p.provider_id == "test_provider_1")
+            provider_1 = next(
+                p for p in result.providers if p.provider_id == "test_provider_1"
+            )
             assert provider_1.benchmark_count == 2
 
-            provider_2 = next(p for p in result.providers if p.provider_id == "test_provider_2")
+            provider_2 = next(
+                p for p in result.providers if p.provider_id == "test_provider_2"
+            )
             assert provider_2.benchmark_count == 1
 
     def test_get_provider_by_id_existing(self, temp_providers_file):
@@ -218,8 +234,15 @@ class TestProviderService:
             # Check benchmark structure
             benchmark = result.benchmarks[0]
             required_fields = [
-                "benchmark_id", "provider_id", "name", "description",
-                "category", "metrics", "num_few_shot", "dataset_size", "tags"
+                "benchmark_id",
+                "provider_id",
+                "name",
+                "description",
+                "category",
+                "metrics",
+                "num_few_shot",
+                "dataset_size",
+                "tags",
             ]
             for field in required_fields:
                 assert field in benchmark
@@ -288,8 +311,7 @@ class TestProviderService:
         """Test searching benchmarks with multiple filters."""
         with create_provider_service_with_test_data(temp_providers_file) as service:
             result = service.search_benchmarks(
-                provider_id="test_provider_1",
-                category="reasoning"
+                provider_id="test_provider_1", category="reasoning"
             )
 
             assert isinstance(result, list)
@@ -320,7 +342,9 @@ class TestProviderService:
             assert "test_collection_2" in collection_ids
 
             # Check benchmark references
-            collection_1 = next(c for c in result.collections if c.collection_id == "test_collection_1")
+            collection_1 = next(
+                c for c in result.collections if c.collection_id == "test_collection_1"
+            )
             assert len(collection_1.benchmarks) == 2
 
     def test_build_lookup_tables(self, temp_providers_file):
@@ -337,7 +361,7 @@ class TestProviderService:
             expected_keys = [
                 "test_provider_1::benchmark_1a",
                 "test_provider_1::benchmark_1b",
-                "test_provider_2::benchmark_2a"
+                "test_provider_2::benchmark_2a",
             ]
             for key in expected_keys:
                 assert key in service._benchmarks_by_id
@@ -345,10 +369,8 @@ class TestProviderService:
     def test_thread_safety(self, temp_providers_file):
         """Test that the service handles concurrent access safely."""
         import threading
-        import time
 
         with create_provider_service_with_test_data(temp_providers_file) as service:
-
             results = []
             errors = []
 
@@ -360,12 +382,14 @@ class TestProviderService:
                     search_result = service.search_benchmarks(category="reasoning")
                     provider = service.get_provider_by_id("test_provider_1")
 
-                    results.append({
-                        "providers_count": providers.total_providers,
-                        "benchmarks_count": benchmarks.total_count,
-                        "search_count": len(search_result),
-                        "provider_found": provider is not None
-                    })
+                    results.append(
+                        {
+                            "providers_count": providers.total_providers,
+                            "benchmarks_count": benchmarks.total_count,
+                            "search_count": len(search_result),
+                            "provider_found": provider is not None,
+                        }
+                    )
                 except Exception as e:
                     errors.append(e)
 
@@ -423,16 +447,18 @@ class TestProviderService:
                     # Missing required fields
                 }
             ],
-            "collections": []
+            "collections": [],
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(invalid_data, f)
             invalid_file_path = f.name
 
         try:
             with create_provider_service_with_test_data(invalid_file_path) as service:
-                with pytest.raises(Exception):  # Should raise validation error when loading
+                with pytest.raises(
+                    Exception
+                ):  # Should raise validation error when loading
                     service.get_all_providers()
         finally:
             os.unlink(invalid_file_path)
@@ -440,10 +466,11 @@ class TestProviderService:
     def test_caching_behavior(self, temp_providers_file):
         """Test that data is cached and not reloaded unnecessarily."""
         with create_provider_service_with_test_data(temp_providers_file) as service:
-
             # Test that after first load, _providers_data is cached
             result1 = service.get_all_providers()
-            assert service._providers_data is not None  # Data should be loaded and cached
+            assert (
+                service._providers_data is not None
+            )  # Data should be loaded and cached
 
             # Store reference to cached data
             cached_data = service._providers_data
@@ -455,8 +482,8 @@ class TestProviderService:
             # Verify the same data instance is used (not reloaded)
             assert service._providers_data is cached_data
             assert result1.total_providers == 2  # Verify data is correct
-            assert result2.total_count == 3     # Verify benchmarks loaded
-            assert len(result3) == 3            # Verify search works
+            assert result2.total_count == 3  # Verify benchmarks loaded
+            assert len(result3) == 3  # Verify search works
 
     def test_benchmark_detail_creation(self, temp_providers_file):
         """Test that BenchmarkDetail objects are created correctly."""
@@ -483,7 +510,7 @@ class TestProviderService:
         """Test various edge cases."""
         # Test with empty providers list
         empty_data = {"providers": [], "collections": []}
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(empty_data, f)
             empty_file_path = f.name
 
@@ -497,22 +524,26 @@ class TestProviderService:
 
         # Test with provider having no benchmarks
         no_benchmarks_data = {
-            "providers": [{
-                "provider_id": "empty_provider",
-                "provider_name": "Empty Provider",
-                "description": "Provider with no benchmarks",
-                "provider_type": "nemo-evaluator",
-                "base_url": "http://empty:8080",
-                "benchmarks": []
-            }],
-            "collections": []
+            "providers": [
+                {
+                    "provider_id": "empty_provider",
+                    "provider_name": "Empty Provider",
+                    "description": "Provider with no benchmarks",
+                    "provider_type": "nemo-evaluator",
+                    "base_url": "http://empty:8080",
+                    "benchmarks": [],
+                }
+            ],
+            "collections": [],
         }
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(no_benchmarks_data, f)
             no_benchmarks_file_path = f.name
 
         try:
-            with create_provider_service_with_test_data(no_benchmarks_file_path) as service:
+            with create_provider_service_with_test_data(
+                no_benchmarks_file_path
+            ) as service:
                 provider = service.get_provider_by_id("empty_provider")
                 assert provider is not None
                 assert len(provider.benchmarks) == 0

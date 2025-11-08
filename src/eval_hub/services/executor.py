@@ -31,18 +31,20 @@ class EvaluationExecutor:
         self.logger = get_logger(__name__)
         self.model_service = model_service
         self.active_tasks: dict[str, TaskInfo] = {}
-        self.execution_semaphore = asyncio.Semaphore(settings.max_concurrent_evaluations)
+        self.execution_semaphore = asyncio.Semaphore(
+            settings.max_concurrent_evaluations
+        )
 
     async def execute_evaluation_request(
         self,
         request: EvaluationRequest,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> list[EvaluationResult]:
         """Execute all evaluations in a request."""
         self.logger.info(
             "Starting evaluation request execution",
             request_id=str(request.request_id),
-            evaluation_count=len(request.evaluations)
+            evaluation_count=len(request.evaluations),
         )
 
         all_results = []
@@ -79,7 +81,9 @@ class EvaluationExecutor:
             "Completed evaluation request execution",
             request_id=str(request.request_id),
             total_results=len(all_results),
-            successful_results=len([r for r in all_results if r.status == EvaluationStatus.COMPLETED])
+            successful_results=len(
+                [r for r in all_results if r.status == EvaluationStatus.COMPLETED]
+            ),
         )
 
         return all_results
@@ -87,14 +91,14 @@ class EvaluationExecutor:
     async def _execute_single_evaluation(
         self,
         evaluation: EvaluationSpec,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> list[EvaluationResult]:
         """Execute a single evaluation across all its backends."""
         log_evaluation_start(
             self.logger,
             str(evaluation.id),
             evaluation.model_name,
-            len(evaluation.backends)
+            len(evaluation.backends),
         )
 
         start_time = time.time()
@@ -110,7 +114,9 @@ class EvaluationExecutor:
                 backend_tasks.append(task)
 
             # Wait for all backends to complete
-            backend_results = await asyncio.gather(*backend_tasks, return_exceptions=True)
+            backend_results = await asyncio.gather(
+                *backend_tasks, return_exceptions=True
+            )
 
             # Process backend results
             for i, backend_result in enumerate(backend_results):
@@ -138,17 +144,14 @@ class EvaluationExecutor:
 
             duration = time.time() - start_time
             log_evaluation_complete(
-                self.logger,
-                str(evaluation.id),
-                overall_status,
-                duration
+                self.logger, str(evaluation.id), overall_status, duration
             )
 
         except Exception as e:
             self.logger.error(
                 "Evaluation execution failed",
                 evaluation_id=str(evaluation.id),
-                error=str(e)
+                error=str(e),
             )
             # Create error result
             error_result = EvaluationResult(
@@ -168,14 +171,14 @@ class EvaluationExecutor:
         self,
         evaluation: EvaluationSpec,
         backend: BackendSpec,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> list[EvaluationResult]:
         """Execute all benchmarks for a specific backend."""
         self.logger.info(
             "Starting backend execution",
             evaluation_id=str(evaluation.id),
             backend_name=backend.name,
-            benchmark_count=len(backend.benchmarks)
+            benchmark_count=len(backend.benchmarks),
         )
 
         results = []
@@ -193,7 +196,7 @@ class EvaluationExecutor:
                     evaluation_id=str(evaluation.id),
                     backend_name=backend.name,
                     benchmark_name=benchmark.name,
-                    error=str(e)
+                    error=str(e),
                 )
                 # Create error result
                 error_result = EvaluationResult(
@@ -214,7 +217,7 @@ class EvaluationExecutor:
         evaluation: EvaluationSpec,
         backend: BackendSpec,
         benchmark: BenchmarkSpec,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Execute a single benchmark on a specific backend."""
         async with self.execution_semaphore:
@@ -222,8 +225,7 @@ class EvaluationExecutor:
             model_server_base_url = None
             if self.model_service:
                 server_model = self.model_service.get_model_on_server(
-                    evaluation.model_server_id,
-                    evaluation.model_name
+                    evaluation.model_server_id, evaluation.model_name
                 )
                 if server_model:
                     server, _ = server_model
@@ -232,7 +234,7 @@ class EvaluationExecutor:
                     self.logger.warning(
                         "Model server or model not found, proceeding without base_url",
                         server_id=evaluation.model_server_id,
-                        model_name=evaluation.model_name
+                        model_name=evaluation.model_name,
                     )
 
             context = ExecutionContext(
@@ -245,7 +247,7 @@ class EvaluationExecutor:
                 timeout_minutes=evaluation.timeout_minutes,
                 retry_attempts=evaluation.retry_attempts,
                 started_at=datetime.utcnow(),
-                metadata=evaluation.metadata
+                metadata=evaluation.metadata,
             )
 
             self.logger.info(
@@ -253,7 +255,7 @@ class EvaluationExecutor:
                 evaluation_id=str(context.evaluation_id),
                 backend_name=backend.name,
                 benchmark_name=benchmark.name,
-                model_name=context.model_name
+                model_name=context.model_name,
             )
 
             # Execute with retries
@@ -267,10 +269,12 @@ class EvaluationExecutor:
                             backend_name=backend.name,
                             benchmark_name=benchmark.name,
                             attempt=attempt + 1,
-                            max_attempts=context.retry_attempts + 1
+                            max_attempts=context.retry_attempts + 1,
                         )
 
-                    result = await self._execute_benchmark_with_timeout(context, progress_callback)
+                    result = await self._execute_benchmark_with_timeout(
+                        context, progress_callback
+                    )
                     return result
 
                 except Exception as e:
@@ -281,12 +285,12 @@ class EvaluationExecutor:
                         backend_name=backend.name,
                         benchmark_name=benchmark.name,
                         attempt=attempt + 1,
-                        error=str(e)
+                        error=str(e),
                     )
 
                     # Wait before retry (exponential backoff)
                     if attempt < context.retry_attempts:
-                        wait_time = 2 ** attempt
+                        wait_time = 2**attempt
                         await asyncio.sleep(wait_time)
 
             # All retries failed
@@ -303,7 +307,7 @@ class EvaluationExecutor:
     async def _execute_benchmark_with_timeout(
         self,
         context: ExecutionContext,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Execute a benchmark with timeout handling."""
         timeout_seconds = context.timeout_minutes * 60
@@ -311,7 +315,7 @@ class EvaluationExecutor:
         try:
             result = await asyncio.wait_for(
                 self._execute_benchmark_impl(context, progress_callback),
-                timeout=timeout_seconds
+                timeout=timeout_seconds,
             )
             return result
         except builtins.TimeoutError:
@@ -322,7 +326,7 @@ class EvaluationExecutor:
     async def _execute_benchmark_impl(
         self,
         context: ExecutionContext,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Implementation of benchmark execution using the executor pattern."""
 
@@ -335,21 +339,23 @@ class EvaluationExecutor:
             evaluation_id=str(context.evaluation_id),
             backend_type=backend_type,
             backend_name=backend_name,
-            benchmark_name=benchmark_name
+            benchmark_name=benchmark_name,
         )
 
         # Check if we have a registered executor for this backend type
         if ExecutorFactory.is_backend_supported(backend_type):
             # Use the executor pattern for supported backends
             try:
-                executor = ExecutorFactory.create_executor(backend_type, context.backend_spec.config)
+                executor = ExecutorFactory.create_executor(
+                    backend_type, context.backend_spec.config
+                )
 
                 # Optional health check
                 if not await executor.health_check():
                     self.logger.warning(
                         "Backend health check failed, proceeding anyway",
                         evaluation_id=str(context.evaluation_id),
-                        backend_type=backend_type
+                        backend_type=backend_type,
                     )
 
                 # Execute using the executor
@@ -363,7 +369,7 @@ class EvaluationExecutor:
                         "Executor cleanup failed",
                         evaluation_id=str(context.evaluation_id),
                         backend_type=backend_type,
-                        error=str(e)
+                        error=str(e),
                     )
 
                 return result
@@ -373,7 +379,7 @@ class EvaluationExecutor:
                     "Executor-based execution failed",
                     evaluation_id=str(context.evaluation_id),
                     backend_type=backend_type,
-                    error=str(e)
+                    error=str(e),
                 )
 
                 return EvaluationResult(
@@ -384,14 +390,16 @@ class EvaluationExecutor:
                     error_message=str(e),
                     started_at=context.started_at,
                     completed_at=datetime.utcnow(),
-                    duration_seconds=(datetime.utcnow() - context.started_at).total_seconds(),
+                    duration_seconds=(
+                        datetime.utcnow() - context.started_at
+                    ).total_seconds(),
                 )
 
         # Fall back to legacy implementations for unsupported backends
         self.logger.info(
             "Using legacy implementation for backend",
             evaluation_id=str(context.evaluation_id),
-            backend_type=backend_type
+            backend_type=backend_type,
         )
 
         # Report progress
@@ -399,7 +407,7 @@ class EvaluationExecutor:
             progress_callback(
                 str(context.evaluation_id),
                 0.0,
-                f"Starting {benchmark_name} on {backend_name}"
+                f"Starting {benchmark_name} on {backend_name}",
             )
 
         # Legacy implementations
@@ -415,7 +423,7 @@ class EvaluationExecutor:
             progress_callback(
                 str(context.evaluation_id),
                 100.0,
-                f"Completed {benchmark_name} on {backend_name}"
+                f"Completed {benchmark_name} on {backend_name}",
             )
 
         return result
@@ -423,7 +431,7 @@ class EvaluationExecutor:
     async def _execute_lm_eval_harness(
         self,
         context: ExecutionContext,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Execute evaluation using lm-evaluation-harness."""
         # Simulate execution time
@@ -435,7 +443,7 @@ class EvaluationExecutor:
                 progress_callback(
                     str(context.evaluation_id),
                     progress,
-                    f"Running {context.benchmark_spec.name} - {progress}% complete"
+                    f"Running {context.benchmark_spec.name} - {progress}% complete",
                 )
 
         # Simulate results
@@ -451,7 +459,9 @@ class EvaluationExecutor:
             benchmark_name=context.benchmark_spec.name,
             status=EvaluationStatus.COMPLETED,
             metrics=metrics,
-            artifacts={"results_json": f"/tmp/results_{context.evaluation_id}_{context.benchmark_spec.name}.json"},
+            artifacts={
+                "results_json": f"/tmp/results_{context.evaluation_id}_{context.benchmark_spec.name}.json"
+            },
             started_at=context.started_at,
             completed_at=datetime.utcnow(),
             duration_seconds=(datetime.utcnow() - context.started_at).total_seconds(),
@@ -460,7 +470,7 @@ class EvaluationExecutor:
     async def _execute_guidellm(
         self,
         context: ExecutionContext,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Execute evaluation using GuideLL."""
         # Simulate execution time
@@ -472,12 +482,13 @@ class EvaluationExecutor:
                 progress_callback(
                     str(context.evaluation_id),
                     progress,
-                    f"Running {context.benchmark_spec.name} with GuideLL - {progress}% complete"
+                    f"Running {context.benchmark_spec.name} with GuideLL - {progress}% complete",
                 )
 
         # Simulate results
         metrics = {
-            "throughput_tokens_per_second": 150 + (hash(str(context.evaluation_id)) % 50),
+            "throughput_tokens_per_second": 150
+            + (hash(str(context.evaluation_id)) % 50),
             "latency_p50_ms": 45 + (hash(str(context.evaluation_id)) % 20),
             "latency_p95_ms": 85 + (hash(str(context.evaluation_id)) % 30),
             "error_rate": 0.01 + (hash(str(context.evaluation_id)) % 5) / 1000,
@@ -489,7 +500,9 @@ class EvaluationExecutor:
             benchmark_name=context.benchmark_spec.name,
             status=EvaluationStatus.COMPLETED,
             metrics=metrics,
-            artifacts={"performance_report": f"/tmp/perf_{context.evaluation_id}_{context.benchmark_spec.name}.json"},
+            artifacts={
+                "performance_report": f"/tmp/perf_{context.evaluation_id}_{context.benchmark_spec.name}.json"
+            },
             started_at=context.started_at,
             completed_at=datetime.utcnow(),
             duration_seconds=(datetime.utcnow() - context.started_at).total_seconds(),
@@ -498,7 +511,7 @@ class EvaluationExecutor:
     async def _execute_custom_backend(
         self,
         context: ExecutionContext,
-        progress_callback: Callable[[str, float, str], None] | None = None
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> EvaluationResult:
         """Execute evaluation using a custom backend."""
         # For custom backends, we would make HTTP requests to their APIs
@@ -508,7 +521,9 @@ class EvaluationExecutor:
         endpoint = backend_config.get("endpoint")
 
         if not endpoint:
-            raise BackendError(f"No endpoint configured for custom backend {context.backend_spec.name}")
+            raise BackendError(
+                f"No endpoint configured for custom backend {context.backend_spec.name}"
+            )
 
         # Simulate custom backend execution
         await asyncio.sleep(15)
@@ -524,7 +539,9 @@ class EvaluationExecutor:
             benchmark_name=context.benchmark_spec.name,
             status=EvaluationStatus.COMPLETED,
             metrics=metrics,
-            artifacts={"custom_results": f"/tmp/custom_{context.evaluation_id}_{context.benchmark_spec.name}.json"},
+            artifacts={
+                "custom_results": f"/tmp/custom_{context.evaluation_id}_{context.benchmark_spec.name}.json"
+            },
             started_at=context.started_at,
             completed_at=datetime.utcnow(),
             duration_seconds=(datetime.utcnow() - context.started_at).total_seconds(),
@@ -540,10 +557,7 @@ class EvaluationExecutor:
         if task_id in self.active_tasks:
             task_info = self.active_tasks[task_id]
             task_info.status = TaskStatus.CANCELLED
-            self.logger.info(
-                "Evaluation cancelled",
-                evaluation_id=str(evaluation_id)
-            )
+            self.logger.info("Evaluation cancelled", evaluation_id=str(evaluation_id))
             return True
         return False
 
