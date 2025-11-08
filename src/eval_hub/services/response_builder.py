@@ -1,0 +1,309 @@
+"""Response builder service for aggregating evaluation results."""
+
+import statistics
+from datetime import datetime
+from typing import Dict, List, Any, Optional, Union
+from uuid import UUID
+
+from ..core.config import Settings
+from ..core.logging import get_logger
+from ..models.evaluation import (
+    EvaluationRequest,
+    EvaluationResponse,
+    EvaluationResult,
+    EvaluationStatus,
+)
+
+
+class ResponseBuilder:
+    """Service for building and aggregating evaluation responses."""
+
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.logger = get_logger(__name__)
+
+    async def build_response(
+        self,
+        request: EvaluationRequest,
+        results: List[EvaluationResult],
+        experiment_url: Optional[str] = None
+    ) -> EvaluationResponse:
+        """Build a comprehensive response from evaluation results."""
+        self.logger.info(
+            "Building evaluation response",
+            request_id=str(request.request_id),
+            result_count=len(results)
+        )
+
+        # Calculate status counts
+        status_counts = self._count_results_by_status(results)
+        total_evaluations = len(results)
+        completed_evaluations = status_counts.get(EvaluationStatus.COMPLETED, 0)
+        failed_evaluations = status_counts.get(EvaluationStatus.FAILED, 0)
+
+        # Determine overall status
+        overall_status = self._determine_overall_status(status_counts, total_evaluations)
+
+        # Calculate progress percentage
+        progress_percentage = self._calculate_progress_percentage(status_counts, total_evaluations)
+
+        # Aggregate metrics
+        aggregated_metrics = await self._aggregate_metrics(results)
+
+        # Estimate completion time
+        estimated_completion = self._estimate_completion_time(results, overall_status)
+
+        response = EvaluationResponse(
+            request_id=request.request_id,
+            status=overall_status,
+            total_evaluations=total_evaluations,
+            completed_evaluations=completed_evaluations,
+            failed_evaluations=failed_evaluations,
+            results=results,
+            aggregated_metrics=aggregated_metrics,
+            experiment_url=experiment_url,
+            created_at=request.created_at,
+            updated_at=datetime.utcnow(),
+            estimated_completion=estimated_completion,
+            progress_percentage=progress_percentage,
+        )
+
+        self.logger.info(
+            "Built evaluation response",
+            request_id=str(request.request_id),
+            overall_status=overall_status,
+            progress_percentage=progress_percentage,
+            completed_count=completed_evaluations,
+            failed_count=failed_evaluations
+        )
+
+        return response
+
+    def _count_results_by_status(self, results: List[EvaluationResult]) -> Dict[EvaluationStatus, int]:
+        """Count results by their status."""
+        counts = {}
+        for result in results:
+            status = result.status
+            counts[status] = counts.get(status, 0) + 1
+        return counts
+
+    def _determine_overall_status(
+        self, status_counts: Dict[EvaluationStatus, int], total_evaluations: int
+    ) -> EvaluationStatus:
+        """Determine the overall status based on individual result statuses."""
+        if not status_counts:
+            return EvaluationStatus.PENDING
+
+        # If any are still running, overall status is running
+        if status_counts.get(EvaluationStatus.RUNNING, 0) > 0:
+            return EvaluationStatus.RUNNING
+
+        # If any are pending, overall status is pending
+        if status_counts.get(EvaluationStatus.PENDING, 0) > 0:
+            return EvaluationStatus.PENDING
+
+        # If all are completed, overall status is completed
+        if status_counts.get(EvaluationStatus.COMPLETED, 0) == total_evaluations:
+            return EvaluationStatus.COMPLETED
+
+        # If any failed, check if all failed or partial
+        failed_count = status_counts.get(EvaluationStatus.FAILED, 0)
+        completed_count = status_counts.get(EvaluationStatus.COMPLETED, 0)
+
+        if failed_count > 0 and completed_count == 0:
+            return EvaluationStatus.FAILED
+        elif failed_count > 0 and completed_count > 0:
+            # Partial completion - consider as completed with some failures
+            return EvaluationStatus.COMPLETED
+        else:
+            return EvaluationStatus.COMPLETED
+
+    def _calculate_progress_percentage(
+        self, status_counts: Dict[EvaluationStatus, int], total_evaluations: int
+    ) -> float:
+        """Calculate overall progress percentage."""
+        if total_evaluations == 0:
+            return 0.0
+
+        completed = status_counts.get(EvaluationStatus.COMPLETED, 0)
+        failed = status_counts.get(EvaluationStatus.FAILED, 0)
+        running = status_counts.get(EvaluationStatus.RUNNING, 0)
+
+        # Completed and failed count as 100% progress
+        # Running counts as 50% progress
+        progress_weight = completed + failed + (running * 0.5)
+        return min(100.0, (progress_weight / total_evaluations) * 100.0)
+
+    async def _aggregate_metrics(self, results: List[EvaluationResult]) -> Dict[str, Union[float, int, str]]:
+        """Aggregate metrics across all evaluation results."""
+        if not results:
+            return {}
+
+        # Only aggregate metrics from completed evaluations
+        completed_results = [r for r in results if r.status == EvaluationStatus.COMPLETED]
+
+        if not completed_results:
+            return {"status": "no_completed_evaluations"}
+
+        self.logger.debug(
+            "Aggregating metrics",
+            total_results=len(results),
+            completed_results=len(completed_results)
+        )
+
+        # Collect all metric names
+        all_metric_names = set()
+        for result in completed_results:
+            all_metric_names.update(result.metrics.keys())
+
+        aggregated = {}
+
+        # Aggregate each metric
+        for metric_name in all_metric_names:
+            values = []
+            for result in completed_results:
+                if metric_name in result.metrics:
+                    value = result.metrics[metric_name]
+                    if isinstance(value, (int, float)):
+                        values.append(float(value))
+
+            if values:
+                # Calculate statistics
+                aggregated[f"{metric_name}_mean"] = statistics.mean(values)
+                aggregated[f"{metric_name}_median"] = statistics.median(values)
+                aggregated[f"{metric_name}_min"] = min(values)
+                aggregated[f"{metric_name}_max"] = max(values)
+                aggregated[f"{metric_name}_std"] = statistics.stdev(values) if len(values) > 1 else 0.0
+                aggregated[f"{metric_name}_count"] = len(values)
+
+        # Add summary statistics
+        aggregated["total_evaluations"] = len(results)
+        aggregated["completed_evaluations"] = len(completed_results)
+        aggregated["success_rate"] = len(completed_results) / len(results) if results else 0.0
+
+        # Calculate average duration
+        durations = [r.duration_seconds for r in completed_results if r.duration_seconds is not None]
+        if durations:
+            aggregated["avg_duration_seconds"] = statistics.mean(durations)
+            aggregated["total_duration_seconds"] = sum(durations)
+
+        # Backend and benchmark statistics
+        backend_counts = {}
+        benchmark_counts = {}
+        for result in completed_results:
+            backend_counts[result.backend_name] = backend_counts.get(result.backend_name, 0) + 1
+            benchmark_counts[result.benchmark_name] = benchmark_counts.get(result.benchmark_name, 0) + 1
+
+        aggregated["backends_used"] = len(backend_counts)
+        aggregated["benchmarks_used"] = len(benchmark_counts)
+        aggregated["most_used_backend"] = max(backend_counts, key=backend_counts.get) if backend_counts else None
+        aggregated["most_used_benchmark"] = max(benchmark_counts, key=benchmark_counts.get) if benchmark_counts else None
+
+        return aggregated
+
+    def _estimate_completion_time(
+        self, results: List[EvaluationResult], overall_status: EvaluationStatus
+    ) -> Optional[datetime]:
+        """Estimate when all evaluations will be completed."""
+        if overall_status in [EvaluationStatus.COMPLETED, EvaluationStatus.FAILED]:
+            return None  # Already completed
+
+        running_results = [r for r in results if r.status == EvaluationStatus.RUNNING]
+        pending_results = [r for r in results if r.status == EvaluationStatus.PENDING]
+
+        if not running_results and not pending_results:
+            return None
+
+        # Estimate based on average duration of completed evaluations
+        completed_results = [r for r in results if r.status == EvaluationStatus.COMPLETED and r.duration_seconds]
+
+        if completed_results:
+            avg_duration = statistics.mean([r.duration_seconds for r in completed_results])
+        else:
+            # Use default estimation
+            avg_duration = 300  # 5 minutes default
+
+        # Estimate remaining time
+        remaining_count = len(running_results) + len(pending_results)
+
+        # Account for concurrency
+        concurrent_slots = min(remaining_count, self.settings.max_concurrent_evaluations)
+        if concurrent_slots > 0:
+            estimated_seconds = (remaining_count / concurrent_slots) * avg_duration
+        else:
+            estimated_seconds = remaining_count * avg_duration
+
+        # Add buffer time
+        estimated_seconds *= 1.2  # 20% buffer
+
+        return datetime.utcnow().replace(microsecond=0) + timedelta(seconds=int(estimated_seconds))
+
+    async def build_summary_response(
+        self, request: EvaluationRequest, results: List[EvaluationResult]
+    ) -> Dict[str, Any]:
+        """Build a summary response with key insights."""
+        aggregated_metrics = await self._aggregate_metrics(results)
+        status_counts = self._count_results_by_status(results)
+
+        # Generate insights
+        insights = []
+
+        # Success rate insight
+        success_rate = aggregated_metrics.get("success_rate", 0.0)
+        if success_rate >= 0.9:
+            insights.append("Excellent success rate - all evaluations completed successfully")
+        elif success_rate >= 0.7:
+            insights.append("Good success rate - most evaluations completed successfully")
+        else:
+            insights.append("Some evaluations failed - review error messages for details")
+
+        # Performance insights
+        if "avg_duration_seconds" in aggregated_metrics:
+            avg_duration = aggregated_metrics["avg_duration_seconds"]
+            if avg_duration < 60:
+                insights.append("Fast evaluation execution - under 1 minute average")
+            elif avg_duration < 300:
+                insights.append("Moderate evaluation execution time")
+            else:
+                insights.append("Long evaluation execution time - consider optimization")
+
+        # Backend insights
+        if aggregated_metrics.get("backends_used", 0) > 1:
+            insights.append(f"Multi-backend evaluation across {aggregated_metrics['backends_used']} backends")
+
+        return {
+            "request_id": str(request.request_id),
+            "summary": {
+                "total_evaluations": len(results),
+                "success_rate": f"{success_rate:.1%}",
+                "avg_duration": f"{aggregated_metrics.get('avg_duration_seconds', 0):.1f}s",
+                "backends_used": aggregated_metrics.get("backends_used", 0),
+                "benchmarks_used": aggregated_metrics.get("benchmarks_used", 0),
+            },
+            "status_breakdown": {status.value: count for status, count in status_counts.items()},
+            "insights": insights,
+            "top_metrics": self._extract_top_metrics(aggregated_metrics),
+        }
+
+    def _extract_top_metrics(self, aggregated_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract the most important metrics for summary display."""
+        top_metrics = {}
+
+        # Define important metric patterns
+        important_patterns = [
+            "accuracy_mean",
+            "f1_score_mean",
+            "bleu_score_mean",
+            "perplexity_mean",
+            "throughput_tokens_per_second_mean",
+            "latency_p50_ms_mean",
+            "error_rate_mean",
+        ]
+
+        for pattern in important_patterns:
+            if pattern in aggregated_metrics:
+                # Clean up the name for display
+                display_name = pattern.replace("_mean", "").replace("_", " ").title()
+                top_metrics[display_name] = aggregated_metrics[pattern]
+
+        return top_metrics
