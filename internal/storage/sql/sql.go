@@ -110,7 +110,7 @@ func (s *SQLStorage) CreateEvaluationJob(executionContext *executioncontext.Exec
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.exec(createAddEntityStatement(), s.sqlConfig.Evaluations.TableName, string(evaluationJSON))
+	result, err := s.exec(createAddEntityStatement(), string(evaluationJSON))
 	if err != nil {
 		return nil, err
 	}

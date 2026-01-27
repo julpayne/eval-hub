@@ -17,6 +17,6 @@ func createCollectionsTable() string {
 // createAddEntityStatement the order or arguments is:
 // table_name entity
 func createAddEntityStatement() string {
-	return `INSERT INTO ? (entity)
+	return `INSERT INTO Evaluations (entity)
 	VALUES (?);`
 }
