@@ -46,10 +46,4 @@ CREATE TABLE IF NOT EXISTS collections (
     tenant_id VARCHAR(255) NOT NULL,
     entity JSONB NOT NULL
 );
-
-CREATE INDEX IF NOT EXISTS idx_eval_entity
-ON evaluations (id);
-
-CREATE INDEX IF NOT EXISTS idx_collection_entity
-ON collections (id);
 `
