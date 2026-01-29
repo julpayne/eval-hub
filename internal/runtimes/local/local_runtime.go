@@ -18,3 +18,7 @@ func NewLocalRuntime(logger *slog.Logger) (abstractions.Runtime, error) {
 func (r *LocalRuntime) RunEvaluationJob(evaluation *api.EvaluationJobResource, storage *abstractions.Storage) error {
 	return nil
 }
+
+func (r *LocalRuntime) Name() string {
+	return "local"
+}

@@ -9,7 +9,7 @@ import (
 	"github.com/eval-hub/eval-hub/internal/runtimes/local"
 )
 
-func NewRuntime(logger *slog.Logger, serviceConfig *config.Config) (*abstractions.Runtime, error) {
+func NewRuntime(logger *slog.Logger, serviceConfig *config.Config) (abstractions.Runtime, error) {
 
 	var runtime abstractions.Runtime
 	var err error
@@ -20,5 +20,5 @@ func NewRuntime(logger *slog.Logger, serviceConfig *config.Config) (*abstraction
 		runtime, err = k8s.NewK8sRuntime(logger)
 	}
 
-	return &runtime, err
+	return runtime, err
 }

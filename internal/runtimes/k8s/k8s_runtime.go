@@ -18,3 +18,7 @@ func NewK8sRuntime(logger *slog.Logger) (abstractions.Runtime, error) {
 func (r *K8sRuntime) RunEvaluationJob(evaluation *api.EvaluationJobResource, storage *abstractions.Storage) error {
 	return nil
 }
+
+func (r *K8sRuntime) Name() string {
+	return "kubernetes"
+}

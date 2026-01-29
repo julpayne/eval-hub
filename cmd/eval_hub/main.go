@@ -73,7 +73,7 @@ func main() {
 		startUpFailed(serviceConfig, err, "Failed to create runtime", logger)
 	}
 
-	logger.Info("Runtime created", "runtime", runtime)
+	logger.Info("Runtime created", "runtime", runtime.Name())
 
 	srv, err := server.NewServer(logger, serviceConfig, providerConfigs, storage, validate, runtime)
 	if err != nil {
