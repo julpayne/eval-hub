@@ -1,20 +1,15 @@
 package handlers
 
 import (
-	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/eval-hub/eval-hub/internal/executioncontext"
+	"github.com/eval-hub/eval-hub/internal/http_wrappers"
 )
 
-func (h *Handlers) HandleOpenAPI(ctx *executioncontext.ExecutionContext, w http.ResponseWriter) {
-	if ctx.Request.Method() != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+func (h *Handlers) HandleOpenAPI(ctx *executioncontext.ExecutionContext, w http_wrappers.ResponseWrapper) {
 
 	// Determine content type based on Accept header
 	accept := ctx.Request.Header("Accept")
@@ -23,7 +18,7 @@ func (h *Handlers) HandleOpenAPI(ctx *executioncontext.ExecutionContext, w http.
 		contentType = "application/json"
 	}
 
-	w.Header().Set("Content-Type", contentType)
+	w.SetHeader("Content-Type", contentType)
 
 	// Find the OpenAPI spec file relative to the working directory
 	// Try multiple possible locations
@@ -62,18 +57,15 @@ func (h *Handlers) HandleOpenAPI(ctx *executioncontext.ExecutionContext, w http.
 	}
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to read OpenAPI spec in paths %s : %s", strings.Join(paths, ", "), err.Error()), http.StatusInternalServerError)
+		ctx.Logger.Error("Failed to read OpenAPI spec", "paths", paths, "error", err.Error())
+		w.Error("Failed to read OpenAPI spec", 500, ctx.RequestID)
 		return
 	}
 
 	w.Write(spec)
 }
 
-func (h *Handlers) HandleDocs(ctx *executioncontext.ExecutionContext, w http.ResponseWriter) {
-	if ctx.Request.Method() != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+func (h *Handlers) HandleDocs(ctx *executioncontext.ExecutionContext, w http_wrappers.ResponseWrapper) {
 
 	// Get the base URL for the OpenAPI spec
 	baseURL := ctx.Request.URI()
@@ -122,6 +114,6 @@ func (h *Handlers) HandleDocs(ctx *executioncontext.ExecutionContext, w http.Res
 </body>
 </html>`
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.SetHeader("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
