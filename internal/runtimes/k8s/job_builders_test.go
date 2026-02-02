@@ -41,13 +41,12 @@ func TestBuildJobRequiresAdapterImage(t *testing.T) {
 
 func TestBuildJobSecurityContext(t *testing.T) {
 	cfg := &jobConfig{
-		jobID:             "job-123",
-		namespace:         "default",
-		providerID:        "provider-1",
-		benchmarkID:       "bench-1",
-		adapterImage:      "adapter:latest",
-		evalHubServiceURL: "http://eval-hub",
-		defaultEnv:        []api.EnvVar{},
+		jobID:        "job-123",
+		namespace:    "default",
+		providerID:   "provider-1",
+		benchmarkID:  "bench-1",
+		adapterImage: "adapter:latest",
+		defaultEnv:   []api.EnvVar{},
 	}
 
 	job, err := buildJob(cfg)
@@ -64,10 +63,22 @@ func TestBuildJobSecurityContext(t *testing.T) {
 	if *container.SecurityContext.AllowPrivilegeEscalation {
 		t.Fatalf("expected allowPrivilegeEscalation to be false")
 	}
+	if container.SecurityContext.RunAsNonRoot == nil || !*container.SecurityContext.RunAsNonRoot {
+		t.Fatalf("expected runAsNonRoot to be true")
+	}
+	if container.SecurityContext.RunAsUser == nil || *container.SecurityContext.RunAsUser == 0 {
+		t.Fatalf("expected non-zero runAsUser")
+	}
+	if container.SecurityContext.RunAsGroup == nil || *container.SecurityContext.RunAsGroup == 0 {
+		t.Fatalf("expected non-zero runAsGroup")
+	}
 	if container.SecurityContext.Capabilities == nil || len(container.SecurityContext.Capabilities.Drop) == 0 {
 		t.Fatalf("expected dropped capabilities")
 	}
 	if container.SecurityContext.Capabilities.Drop[0] != "ALL" {
 		t.Fatalf("expected ALL capability drop")
+	}
+	if container.SecurityContext.SeccompProfile == nil || container.SecurityContext.SeccompProfile.Type == "" {
+		t.Fatalf("expected seccomp profile to be set")
 	}
 }

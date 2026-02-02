@@ -87,6 +87,7 @@ type EvaluationJobConfig struct {
 	Experiment     ExperimentConfig  `json:"experiment"`
 	TimeoutMinutes *int              `json:"timeout_minutes,omitempty"`
 	RetryAttempts  *int              `json:"retry_attempts,omitempty"`
+	CallbackURL    *string           `json:"callback_url,omitempty"`
 }
 
 type EvaluationResource struct {

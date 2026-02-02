@@ -21,13 +21,14 @@ const (
 	jobPrefix                       = "eval-job-"
 	specSuffix                      = "-spec"
 	envJobIDName                    = "JOB_ID"
-	envServiceURLName               = "EVALHUB_SERVICE_URL"
 	defaultAllowPrivilegeEscalation = false
+	defaultRunAsUser                = int64(1000)
+	defaultRunAsGroup               = int64(1000)
 	labelAppKey                     = "app"
 	labelComponentKey               = "component"
-	labelJobIDKey                   = "job-id"
-	labelProviderIDKey              = "provider-id"
-	labelBenchmarkIDKey             = "benchmark-id"
+	labelJobIDKey                   = "job_id"
+	labelProviderIDKey              = "provider_id"
+	labelBenchmarkIDKey             = "benchmark_id"
 	labelAppValue                   = "evalhub"
 	labelComponentValue             = "evaluation-job"
 	capabilityDropAll               = "ALL"
@@ -127,15 +128,25 @@ func buildJob(cfg *jobConfig) (*batchv1.Job, error) {
 func defaultSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
 		AllowPrivilegeEscalation: boolPtr(defaultAllowPrivilegeEscalation),
+		RunAsNonRoot:             boolPtr(true),
+		RunAsUser:                int64Ptr(defaultRunAsUser),
+		RunAsGroup:               int64Ptr(defaultRunAsGroup),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{
 				capabilityDropAll,
 			},
 		},
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 	}
 }
 
 func boolPtr(value bool) *bool {
+	return &value
+}
+
+func int64Ptr(value int64) *int64 {
 	return &value
 }
 
@@ -147,11 +158,6 @@ func buildEnvVars(cfg *jobConfig) []corev1.EnvVar {
 		Value: cfg.jobID,
 	})
 	seen[envJobIDName] = true
-	env = append(env, corev1.EnvVar{
-		Name:  envServiceURLName,
-		Value: cfg.evalHubServiceURL,
-	})
-	seen[envServiceURLName] = true
 	for _, item := range cfg.defaultEnv {
 		if item.Name == "" || seen[item.Name] {
 			continue

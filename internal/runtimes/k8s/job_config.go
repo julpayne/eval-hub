@@ -16,32 +16,38 @@ const (
 	defaultCPULimit        = "1"
 	defaultMemoryLimit     = "2Gi"
 	defaultNamespace       = "default"
-	evalHubServiceEnv      = "EVALHUB_SERVICE_URL"
 	inClusterNamespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
 type jobConfig struct {
-	jobID             string
-	namespace         string
-	providerID        string
-	benchmarkID       string
-	retryAttempts     int
-	adapterImage      string
-	evalHubServiceURL string
-	defaultEnv        []api.EnvVar
-	cpuRequest        string
-	memoryRequest     string
-	cpuLimit          string
-	memoryLimit       string
-	jobSpecJSON       string
+	jobID         string
+	namespace     string
+	providerID    string
+	benchmarkID   string
+	retryAttempts int
+	adapterImage  string
+	defaultEnv    []api.EnvVar
+	cpuRequest    string
+	memoryRequest string
+	cpuLimit      string
+	memoryLimit   string
+	jobSpecJSON   string
+}
+
+type jobSpec struct {
+	JobID           string            `json:"job_id"`
+	BenchmarkID     string            `json:"benchmark_id"`
+	Model           api.ModelRef      `json:"model"`
+	NumExamples     *int              `json:"num_examples,omitempty"`
+	BenchmarkConfig map[string]any    `json:"benchmark_config,omitempty"`
+	ExperimentName  string            `json:"experiment_name,omitempty"`
+	Tags            map[string]string `json:"tags,omitempty"`
+	TimeoutSeconds  *int              `json:"timeout_seconds,omitempty"`
+	RetryAttempts   *int              `json:"retry_attempts,omitempty"`
+	CallbackURL     *string           `json:"callback_url,omitempty"`
 }
 
 func buildJobConfig(evaluation *api.EvaluationJobResource, provider *api.ProviderResource, benchmarkID string) (*jobConfig, error) {
-	specJSON, err := json.MarshalIndent(evaluation, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal job spec: %w", err)
-	}
-
 	runtime := provider.Runtime
 	if runtime == nil || runtime.K8s == nil {
 		return nil, fmt.Errorf("provider %q missing runtime configuration", provider.ProviderID)
@@ -55,10 +61,6 @@ func buildJobConfig(evaluation *api.EvaluationJobResource, provider *api.Provide
 	if runtime.K8s.Image == "" {
 		return nil, fmt.Errorf("runtime adapter image is required")
 	}
-	evalHubServiceURL := os.Getenv(evalHubServiceEnv)
-	if evalHubServiceURL == "" {
-		return nil, fmt.Errorf("%s is required", evalHubServiceEnv)
-	}
 
 	retryAttempts := 0
 	if evaluation.RetryAttempts != nil {
@@ -68,21 +70,42 @@ func buildJobConfig(evaluation *api.EvaluationJobResource, provider *api.Provide
 		retryAttempts = *evaluation.RetryAttempts
 	}
 	namespace := resolveNamespace("")
+	benchmarkConfig, err := findBenchmarkConfig(evaluation, benchmarkID)
+	if err != nil {
+		return nil, err
+	}
+	timeoutSeconds := timeoutSecondsFromMinutes(evaluation.TimeoutMinutes)
+	numExamples := numExamplesFromParameters(benchmarkConfig.Parameters)
+	spec := jobSpec{
+		JobID:           evaluation.Resource.ID,
+		BenchmarkID:     benchmarkID,
+		Model:           evaluation.Model,
+		NumExamples:     numExamples,
+		BenchmarkConfig: benchmarkConfig.Parameters,
+		ExperimentName:  evaluation.Experiment.Name,
+		Tags:            evaluation.Experiment.Tags,
+		TimeoutSeconds:  timeoutSeconds,
+		RetryAttempts:   evaluation.RetryAttempts,
+		CallbackURL:     evaluation.CallbackURL,
+	}
+	specJSON, err := json.MarshalIndent(spec, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshal job spec: %w", err)
+	}
 
 	return &jobConfig{
-		jobID:             evaluation.Resource.ID,
-		namespace:         namespace,
-		providerID:        provider.ProviderID,
-		benchmarkID:       benchmarkID,
-		retryAttempts:     retryAttempts,
-		adapterImage:      runtime.K8s.Image,
-		evalHubServiceURL: evalHubServiceURL,
-		defaultEnv:        runtime.K8s.Env,
-		cpuRequest:        cpuRequest,
-		memoryRequest:     memoryRequest,
-		cpuLimit:          cpuLimit,
-		memoryLimit:       memoryLimit,
-		jobSpecJSON:       string(specJSON),
+		jobID:         evaluation.Resource.ID,
+		namespace:     namespace,
+		providerID:    provider.ProviderID,
+		benchmarkID:   benchmarkID,
+		retryAttempts: retryAttempts,
+		adapterImage:  runtime.K8s.Image,
+		defaultEnv:    runtime.K8s.Env,
+		cpuRequest:    cpuRequest,
+		memoryRequest: memoryRequest,
+		cpuLimit:      cpuLimit,
+		memoryLimit:   memoryLimit,
+		jobSpecJSON:   string(specJSON),
 	}, nil
 }
 
@@ -110,4 +133,47 @@ func readInClusterNamespace() string {
 		return ""
 	}
 	return strings.TrimSpace(string(content))
+}
+
+func findBenchmarkConfig(evaluation *api.EvaluationJobResource, benchmarkID string) (*api.BenchmarkConfig, error) {
+	for i := range evaluation.Benchmarks {
+		benchmark := &evaluation.Benchmarks[i]
+		if benchmark.ID == benchmarkID {
+			return benchmark, nil
+		}
+	}
+	return nil, fmt.Errorf("benchmark config not found for %q", benchmarkID)
+}
+
+func timeoutSecondsFromMinutes(minutes *int) *int {
+	if minutes == nil {
+		return nil
+	}
+	seconds := *minutes * 60
+	return &seconds
+}
+
+func numExamplesFromParameters(parameters map[string]any) *int {
+	if parameters == nil {
+		return nil
+	}
+	value, ok := parameters["num_examples"]
+	if !ok {
+		return nil
+	}
+	switch typed := value.(type) {
+	case int:
+		return &typed
+	case int32:
+		converted := int(typed)
+		return &converted
+	case int64:
+		converted := int(typed)
+		return &converted
+	case float64:
+		converted := int(typed)
+		return &converted
+	default:
+		return nil
+	}
 }
