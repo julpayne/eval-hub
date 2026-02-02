@@ -6,41 +6,29 @@ metadata:
   labels:
     app: "evalhub"
     component: "evaluation-job"
-    job-id: "001"
-    provider-id: "lm_evaluation_harness"
-    benchmark-id: "mmlu"
+    job_id: "001"
+    provider_id: "lm_evaluation_harness"
+    benchmark_id: "mmlu"
 data:
   job.json: |
     {
-      "id": "001",
-      "tenant": "acme",
-      "created_at": "2026-01-28T10:00:00Z",
-      "updated_at": "2026-01-28T10:05:00Z",
+      "job_id": "001", # mandatory
+      "benchmark_id": "mmlu",
       "model": {
         "url": "http://model-server.models.svc.cluster.local:8000/v1",
         "name": "example-model"
       },
-      "benchmarks": [
-        {
-          "id": "mmlu",
-          "limit": 50,
-          "parameters": {
-            "max_tokens": 128,
-            "temperature": 0.2
-          }
-        }
-      ],
-      "collection": {
-        "id": "collection-1"
+      "num_examples": 50,
+      "benchmark_config": {
+        "max_tokens": 128,
+        "temperature": 0.2
       },
-      "experiment": {
-        "name": "eval-experiment",
-        "tags": {
-          "team": "evals",
-          "env": "dev"
-        }
+      "experiment_name": "eval-experiment",
+      "tags": {
+        "team": "evals",
+        "env": "dev"
       },
-      "timeout_minutes": 30,
+      "timeout_seconds": 1800,
       "retry_attempts": 2,
       "callback_url": "https://example.org/eval/callback"
     }

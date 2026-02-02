@@ -6,9 +6,9 @@ metadata:
   labels:
     app: "evalhub"
     component: "evaluation-job"
-    job-id: "001"
-    provider-id: "lm_evaluation_harness"
-    benchmark-id: "mmlu"
+    job_id: "001"
+    provider_id: "lm_evaluation_harness"
+    benchmark_id: "mmlu"
 spec:
   backoffLimit: 2
   ttlSecondsAfterFinished: 3600
@@ -17,9 +17,9 @@ spec:
       labels:
         app: "evalhub"
         component: "evaluation-job"
-        job-id: "001"
-        provider-id: "lm_evaluation_harness"
-        benchmark-id: "mmlu"
+        job_id: "001"
+        provider_id: "lm_evaluation_harness"
+        benchmark_id: "mmlu"
     spec:
       restartPolicy: Never
       containers:
