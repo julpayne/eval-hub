@@ -52,7 +52,7 @@ func buildJobConfig(evaluation *api.EvaluationJobResource, provider *api.Provide
 	cpuLimit := defaultIfEmpty(runtime.CPULimit, defaultCPULimit)
 	memoryLimit := defaultIfEmpty(runtime.MemoryLimit, defaultMemoryLimit)
 
-	if runtime.AdapterImage == "" {
+	if runtime.Image == "" {
 		return nil, fmt.Errorf("runtime adapter image is required")
 	}
 	evalHubServiceURL := os.Getenv(evalHubServiceEnv)
@@ -75,7 +75,7 @@ func buildJobConfig(evaluation *api.EvaluationJobResource, provider *api.Provide
 		providerID:        provider.ProviderID,
 		benchmarkID:       benchmarkID,
 		retryAttempts:     retryAttempts,
-		adapterImage:      runtime.AdapterImage,
+		adapterImage:      runtime.Image,
 		evalHubServiceURL: evalHubServiceURL,
 		defaultEnv:        runtime.DefaultEnv,
 		cpuRequest:        cpuRequest,

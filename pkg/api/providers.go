@@ -16,7 +16,8 @@ type ProviderResource struct {
 // Example YAML for provider configs:
 //
 //	runtime:
-//	  adapter_image: "quay.io/eval-hub/adapter:latest"
+//	  image: "quay.io/eval-hub/adapter:latest"
+//	  entrypoint: "/path/to/program"
 //	  cpu_request: "250m"
 //	  memory_request: "512Mi"
 //	  cpu_limit: "1"
@@ -25,7 +26,8 @@ type ProviderResource struct {
 //	    - name: FOO
 //	      value: "bar"
 type ProviderRuntime struct {
-	AdapterImage  string           `mapstructure:"adapter_image" yaml:"adapter_image"`
+	Image         string           `mapstructure:"image" yaml:"image"`
+	Entrypoint    string           `mapstructure:"entrypoint" yaml:"entrypoint"`
 	CPURequest    string           `mapstructure:"cpu_request" yaml:"cpu_request"`
 	MemoryRequest string           `mapstructure:"memory_request" yaml:"memory_request"`
 	CPULimit      string           `mapstructure:"cpu_limit" yaml:"cpu_limit"`

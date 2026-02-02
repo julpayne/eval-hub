@@ -22,7 +22,7 @@ func TestBuildJobConfigDefaults(t *testing.T) {
 	provider := &api.ProviderResource{
 		ProviderID: "provider-1",
 		Runtime: &api.ProviderRuntime{
-			AdapterImage: "adapter:latest",
+			Image: "adapter:latest",
 		},
 	}
 
@@ -113,7 +113,7 @@ func TestBuildJobConfigMissingServiceURL(t *testing.T) {
 	provider := &api.ProviderResource{
 		ProviderID: "provider-1",
 		Runtime: &api.ProviderRuntime{
-			AdapterImage: "adapter:latest",
+			Image: "adapter:latest",
 		},
 	}
 
