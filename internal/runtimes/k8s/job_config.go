@@ -70,7 +70,7 @@ func buildJobConfig(evaluation *api.EvaluationJobResource, provider *api.Provide
 	namespace := resolveNamespace("")
 
 	return &jobConfig{
-		jobID:             evaluation.ID,
+		jobID:             evaluation.Resource.ID,
 		namespace:         namespace,
 		providerID:        provider.ProviderID,
 		benchmarkID:       benchmarkID,

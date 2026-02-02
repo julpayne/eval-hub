@@ -11,7 +11,10 @@ func TestBuildJobConfigDefaults(t *testing.T) {
 	t.Setenv(evalHubServiceEnv, "http://eval-hub")
 	retry := 2
 	evaluation := &api.EvaluationJobResource{
-		Resource: api.Resource{ID: "job-123"},
+		Resource: api.EvaluationResource{
+			Resource:           api.Resource{ID: "job-123"},
+			MLFlowExperimentID: nil,
+		},
 		EvaluationJobConfig: api.EvaluationJobConfig{
 			RetryAttempts: &retry,
 		},
@@ -55,16 +58,20 @@ func TestBuildJobConfigDefaults(t *testing.T) {
 	if err := json.Unmarshal([]byte(cfg.jobSpecJSON), &decoded); err != nil {
 		t.Fatalf("unmarshal job spec json: %v", err)
 	}
-	idValue, ok := decoded["id"].(string)
+	idValue, ok := decoded["resource"].(map[string]any)["id"].(string)
 	if !ok || idValue != "job-123" {
-		t.Fatalf("expected job spec json id to be %q, got %v", "job-123", decoded["id"])
+		t.Fatalf("expected job spec json id to be %q, got %v", "job-123", idValue)
 	}
 }
 
 func TestBuildJobConfigMissingRuntime(t *testing.T) {
 	t.Setenv(evalHubServiceEnv, "http://eval-hub")
+
 	evaluation := &api.EvaluationJobResource{
-		Resource: api.Resource{ID: "job-123"},
+		Resource: api.EvaluationResource{
+			Resource:           api.Resource{ID: "job-123"},
+			MLFlowExperimentID: nil,
+		},
 	}
 	provider := &api.ProviderResource{
 		ProviderID: "provider-1",
@@ -78,8 +85,12 @@ func TestBuildJobConfigMissingRuntime(t *testing.T) {
 
 func TestBuildJobConfigMissingAdapterImage(t *testing.T) {
 	t.Setenv(evalHubServiceEnv, "http://eval-hub")
+
 	evaluation := &api.EvaluationJobResource{
-		Resource: api.Resource{ID: "job-123"},
+		Resource: api.EvaluationResource{
+			Resource:           api.Resource{ID: "job-123"},
+			MLFlowExperimentID: nil,
+		},
 	}
 	provider := &api.ProviderResource{
 		ProviderID: "provider-1",
@@ -94,7 +105,10 @@ func TestBuildJobConfigMissingAdapterImage(t *testing.T) {
 
 func TestBuildJobConfigMissingServiceURL(t *testing.T) {
 	evaluation := &api.EvaluationJobResource{
-		Resource: api.Resource{ID: "job-123"},
+		Resource: api.EvaluationResource{
+			Resource:           api.Resource{ID: "job-123"},
+			MLFlowExperimentID: nil,
+		},
 	}
 	provider := &api.ProviderResource{
 		ProviderID: "provider-1",
