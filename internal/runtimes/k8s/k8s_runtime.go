@@ -8,7 +8,6 @@ import (
 
 	"github.com/eval-hub/eval-hub/internal/abstractions"
 	"github.com/eval-hub/eval-hub/internal/constants"
-	"github.com/eval-hub/eval-hub/internal/executioncontext"
 	"github.com/eval-hub/eval-hub/pkg/api"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,20 +30,19 @@ func NewK8sRuntime(logger *slog.Logger, providerConfigs map[string]api.ProviderR
 	return &K8sRuntime{logger: logger, helper: helper, providers: providerConfigs}, nil
 }
 
-func (r *K8sRuntime) RunEvaluationJob(ctx *executioncontext.ExecutionContext, evaluation *api.EvaluationJobResource, storage *abstractions.Storage) error {
+func (r *K8sRuntime) WithLogger(logger *slog.Logger) abstractions.Runtime {
+	newRuntime := r
+	newRuntime.logger = logger
+	return newRuntime
+}
+
+func (r *K8sRuntime) RunEvaluationJob(evaluation *api.EvaluationJobResource, storage *abstractions.Storage) error {
 	_ = storage
 	if evaluation == nil {
 		return fmt.Errorf("evaluation is required")
 	}
 
-	if ctx == nil || ctx.Logger == nil {
-		return fmt.Errorf("execution context logger is required")
-	}
-	logger := ctx.Logger
-	baseCtx := ctx.Ctx
-	if baseCtx == nil {
-		baseCtx = context.Background()
-	}
+	baseCtx := context.Background()
 
 	if len(evaluation.Benchmarks) == 0 {
 		return nil
@@ -66,25 +64,22 @@ func (r *K8sRuntime) RunEvaluationJob(ctx *executioncontext.ExecutionContext, ev
 			for bench := range benchmarks {
 				select {
 				case <-baseCtx.Done():
-					if logger != nil {
-						logger.Warn(
-							"benchmark processing canceled",
-							"job_id", evaluation.Resource.ID,
-							"benchmark_id", bench.ID,
-						)
-					}
+					r.logger.Warn(
+						"benchmark processing canceled",
+						"job_id", evaluation.Resource.ID,
+						"benchmark_id", bench.ID,
+					)
 					return
 				default:
 				}
-				if err := r.createBenchmarkResources(baseCtx, logger, evaluation, &bench); err != nil {
-					if logger != nil {
-						logger.Error(
-							"kubernetes job creation failed",
-							"error", err,
-							"job_id", evaluation.Resource.ID,
-							"benchmark_id", bench.ID,
-						)
-					}
+				if err := r.createBenchmarkResources(baseCtx, r.logger, evaluation, &bench); err != nil {
+					r.logger.Error(
+						"kubernetes job creation failed",
+						"error", err,
+						"job_id", evaluation.Resource.ID,
+						"benchmark_id", bench.ID,
+					)
+
 					// TODO update the benchmark status to failed
 					//r.persistJobFailure(logger, storage, evaluation, err)
 				}
@@ -147,13 +142,11 @@ func (r *K8sRuntime) createBenchmarkResources(ctx context.Context, logger *slog.
 	return nil
 }
 
-func (r *K8sRuntime) persistJobFailure(logger *slog.Logger, storage *abstractions.Storage, evaluation *api.EvaluationJobResource, runErr error) {
+func (r *K8sRuntime) persistJobFailure(storage *abstractions.Storage, evaluation *api.EvaluationJobResource, runErr error) {
 	if storage == nil || *storage == nil || evaluation == nil {
 		return
 	}
-	if logger == nil {
-		logger = r.logger
-	}
+
 	status := &api.StatusEvent{
 		StatusEvent: &api.EvaluationJobStatus{
 			EvaluationJobState: api.EvaluationJobState{

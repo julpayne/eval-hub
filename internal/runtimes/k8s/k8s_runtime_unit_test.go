@@ -60,8 +60,8 @@ func (f *fakeStorage) WithLogger(_ *slog.Logger) abstractions.Storage {
 	return f
 }
 func TestPersistJobFailureNoStorage(t *testing.T) {
-	runtime := &K8sRuntime{}
-	runtime.persistJobFailure(nil, nil, nil, context.Canceled)
+	runtime := &K8sRuntime{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	runtime.persistJobFailure(nil, nil, context.Canceled)
 }
 
 func TestPersistJobFailureUpdatesStatus(t *testing.T) {
@@ -73,7 +73,7 @@ func TestPersistJobFailureUpdatesStatus(t *testing.T) {
 			Resource: api.Resource{ID: "job-1"},
 		},
 	}
-	runtime.persistJobFailure(runtime.logger, &store, evaluation, context.Canceled)
+	runtime.persistJobFailure(&store, evaluation, context.Canceled)
 	if !storage.called {
 		t.Fatalf("expected UpdateEvaluationJobStatus to be called")
 	}
