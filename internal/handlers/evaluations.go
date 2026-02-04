@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strconv"
-	"strings"
 
+	"github.com/eval-hub/eval-hub/internal/constants"
 	"github.com/eval-hub/eval-hub/internal/executioncontext"
 	"github.com/eval-hub/eval-hub/internal/http_wrappers"
 	"github.com/eval-hub/eval-hub/internal/logging"
@@ -26,21 +26,6 @@ type BenchmarkSpec struct {
 	BenchmarkID string                 `json:"benchmark_id"`
 	ProviderID  string                 `json:"provider_id"`
 	Config      map[string]interface{} `json:"config,omitempty"`
-}
-
-func getEvaluationJobID(r http_wrappers.RequestWrapper) string {
-	if _, after, found := strings.Cut(r.URI(), "/api/v1/evaluations/jobs/"); found {
-		if after != "" {
-			if id, _, found := strings.Cut(after, "/"); found {
-				return id
-			}
-			if id, _, found := strings.Cut(after, "?"); found {
-				return id
-			}
-			return after
-		}
-	}
-	return ""
 }
 
 func getParam[T string | int | bool](r http_wrappers.RequestWrapper, name string, optional bool, defaultValue T) (T, error) {
@@ -74,24 +59,26 @@ func getParam[T string | int | bool](r http_wrappers.RequestWrapper, name string
 
 // HandleCreateEvaluation handles POST /api/v1/evaluations/jobs
 func (h *Handlers) HandleCreateEvaluation(ctx *executioncontext.ExecutionContext, req http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger).WithContext(ctx.Ctx)
+
 	logging.LogRequestStarted(ctx)
 
 	// get the body bytes from the context
 	bodyBytes, err := req.BodyAsBytes()
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 	evaluation := &api.EvaluationJobConfig{}
 	err = serialization.Unmarshal(h.validate, ctx, bodyBytes, evaluation)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 
-	response, err := h.storage.CreateEvaluationJob(ctx, evaluation)
+	response, err := storage.CreateEvaluationJob(evaluation)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 
@@ -103,7 +90,7 @@ func (h *Handlers) HandleCreateEvaluation(ctx *executioncontext.ExecutionContext
 					ctx.Logger.Error("panic in RunEvaluationJob goroutine", "panic", recovered, "stack", string(debug.Stack()), "job_id", job.Resource.ID)
 				}
 			}()
-			if err := h.runtime.RunEvaluationJob(job, &h.storage); err != nil {
+			if err := h.runtime.WithContext(ctx.Ctx).RunEvaluationJob(job, &storage); err != nil {
 				ctx.Logger.Error("RunEvaluationJob failed", "error", err, "job_id", job.Resource.ID)
 			}
 		}()
@@ -114,46 +101,56 @@ func (h *Handlers) HandleCreateEvaluation(ctx *executioncontext.ExecutionContext
 
 // HandleListEvaluations handles GET /api/v1/evaluations/jobs
 func (h *Handlers) HandleListEvaluations(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger).WithContext(ctx.Ctx)
+
 	logging.LogRequestStarted(ctx)
 
 	limit, err := getParam(r, "limit", true, 50)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 	offset, err := getParam(r, "offset", true, 0)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 	statusFilter, err := getParam(r, "status_filter", true, "")
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
-	response, err := h.storage.GetEvaluationJobs(ctx, r, limit, offset, statusFilter)
+	res, err := storage.GetEvaluationJobs(limit, offset, statusFilter)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
-
-	w.WriteJSON(response, 200)
+	page, err := CreatePage(res.TotalStored, offset, limit, ctx, r)
+	if err != nil {
+		w.Error(err, ctx.RequestID)
+		return
+	}
+	w.WriteJSON(api.EvaluationJobResourceList{
+		Page:  *page,
+		Items: res.Items,
+	}, 200)
 }
 
 // HandleGetEvaluation handles GET /api/v1/evaluations/jobs/{id}
 func (h *Handlers) HandleGetEvaluation(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger).WithContext(ctx.Ctx)
 	logging.LogRequestStarted(ctx)
 
 	// Extract ID from path
-	evaluationJobID := getEvaluationJobID(r)
+	evaluationJobID := r.PathValue(constants.PATH_PARAMETER_JOB_ID)
 	if evaluationJobID == "" {
-		w.ErrorWithError(serviceerrors.NewServiceError(messages.MissingPathParameter, "ParameterName", "id"), ctx.RequestID)
+		w.Error(serviceerrors.NewServiceError(messages.MissingPathParameter, "ParameterName", constants.PATH_PARAMETER_JOB_ID), ctx.RequestID)
 		return
 	}
 
-	response, err := h.storage.GetEvaluationJob(ctx, evaluationJobID)
+	response, err := storage.GetEvaluationJob(evaluationJobID)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 
@@ -161,31 +158,32 @@ func (h *Handlers) HandleGetEvaluation(ctx *executioncontext.ExecutionContext, r
 }
 
 func (h *Handlers) HandleUpdateEvaluation(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger).WithContext(ctx.Ctx)
 	logging.LogRequestStarted(ctx)
 
 	// Extract ID from path
-	evaluationJobID := getEvaluationJobID(r)
+	evaluationJobID := r.PathValue(constants.PATH_PARAMETER_JOB_ID)
 	if evaluationJobID == "" {
-		w.ErrorWithError(serviceerrors.NewServiceError(messages.MissingPathParameter, "ParameterName", "id"), ctx.RequestID)
+		w.Error(serviceerrors.NewServiceError(messages.MissingPathParameter, "ParameterName", constants.PATH_PARAMETER_JOB_ID), ctx.RequestID)
 		return
 	}
 
 	// get the body bytes from the context
 	bodyBytes, err := r.BodyAsBytes()
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 	status := &api.StatusEvent{}
 	err = serialization.Unmarshal(h.validate, ctx, bodyBytes, status)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 
-	err = h.storage.UpdateEvaluationJobStatus(ctx, evaluationJobID, status)
+	err = storage.UpdateEvaluationJobStatus(evaluationJobID, status)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 
@@ -194,25 +192,26 @@ func (h *Handlers) HandleUpdateEvaluation(ctx *executioncontext.ExecutionContext
 
 // HandleCancelEvaluation handles DELETE /api/v1/evaluations/jobs/{id}
 func (h *Handlers) HandleCancelEvaluation(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger).WithContext(ctx.Ctx)
 	logging.LogRequestStarted(ctx)
 
 	// Extract ID from path
-	evaluationJobID := getEvaluationJobID(r)
+	evaluationJobID := r.PathValue(constants.PATH_PARAMETER_JOB_ID)
 	if evaluationJobID == "" {
-		w.ErrorWithError(serviceerrors.NewServiceError(messages.MissingPathParameter, "ParameterName", "id"), ctx.RequestID)
+		w.Error(serviceerrors.NewServiceError(messages.MissingPathParameter, "ParameterName", constants.PATH_PARAMETER_JOB_ID), ctx.RequestID)
 		return
 	}
 
 	hardDelete, err := getParam(r, "hard_delete", true, false)
 	if err != nil {
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 
-	err = h.storage.DeleteEvaluationJob(ctx, evaluationJobID, hardDelete)
+	err = storage.DeleteEvaluationJob(evaluationJobID, hardDelete)
 	if err != nil {
 		ctx.Logger.Info("Failed to delete evaluation job", "error", err.Error(), "id", evaluationJobID, "hardDelete", hardDelete)
-		w.ErrorWithError(err, ctx.RequestID)
+		w.Error(err, ctx.RequestID)
 		return
 	}
 	w.WriteJSON(nil, 204)

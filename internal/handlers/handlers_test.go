@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"testing"
@@ -66,6 +67,10 @@ func (r *MockRequest) SetHeader(key string, value string) {
 	r.headers[key] = value
 }
 
+func (r *MockRequest) PathValue(name string) string {
+	return ""
+}
+
 type MockResponseWrapper struct {
 	recorder *httptest.ResponseRecorder
 }
@@ -86,16 +91,13 @@ func (w MockResponseWrapper) Write(buf []byte) (int, error) {
 	return w.recorder.Write(buf)
 }
 
-func (w MockResponseWrapper) Error(err string, code int, requestId string) {
-	w.WriteJSON(api.Error{Message: err, Code: code, Trace: requestId}, code)
-}
-
-func (w MockResponseWrapper) ErrorWithError(err error, requestId string) {
-	if e, ok := err.(abstractions.ServiceError); ok {
+func (w MockResponseWrapper) Error(err error, requestId string) {
+	var e abstractions.ServiceError
+	if errors.As(err, &e) {
 		w.ErrorWithMessageCode(requestId, e.MessageCode(), e.MessageParams()...)
 		return
 	}
-	w.ErrorWithMessageCode(requestId, messages.UnknownError, err.Error())
+	w.ErrorWithMessageCode(requestId, messages.UnknownError, "Error", err.Error())
 }
 
 func (w MockResponseWrapper) ErrorWithMessageCode(requestId string, messageCode *messages.MessageCode, messageParams ...any) {
