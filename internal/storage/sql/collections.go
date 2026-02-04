@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"github.com/eval-hub/eval-hub/internal/abstractions"
 	"github.com/eval-hub/eval-hub/pkg/api"
 )
 
@@ -16,7 +17,7 @@ func (s *SQLStorage) GetCollection(id string, summary bool) (*api.CollectionReso
 	return nil, nil
 }
 
-func (s *SQLStorage) GetCollections(limit int, offset int) ([]api.CollectionResource, error) {
+func (s *SQLStorage) GetCollections(limit int, offset int) (*abstractions.QueryResults[api.CollectionResource], error) {
 	return nil, nil
 }
 

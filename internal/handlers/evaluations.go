@@ -74,6 +74,8 @@ func getParam[T string | int | bool](r http_wrappers.RequestWrapper, name string
 
 // HandleCreateEvaluation handles POST /api/v1/evaluations/jobs
 func (h *Handlers) HandleCreateEvaluation(ctx *executioncontext.ExecutionContext, req http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger)
+
 	logging.LogRequestStarted(ctx)
 
 	// get the body bytes from the context
@@ -89,7 +91,7 @@ func (h *Handlers) HandleCreateEvaluation(ctx *executioncontext.ExecutionContext
 		return
 	}
 
-	response, err := h.storage.CreateEvaluationJob(evaluation)
+	response, err := storage.CreateEvaluationJob(evaluation)
 	if err != nil {
 		w.Error(err, ctx.RequestID)
 		return
@@ -103,7 +105,7 @@ func (h *Handlers) HandleCreateEvaluation(ctx *executioncontext.ExecutionContext
 					ctx.Logger.Error("panic in RunEvaluationJob goroutine", "panic", recovered, "stack", string(debug.Stack()), "job_id", job.Resource.ID)
 				}
 			}()
-			if err := h.runtime.RunEvaluationJob(job, &h.storage); err != nil {
+			if err := h.runtime.RunEvaluationJob(job, &storage); err != nil {
 				ctx.Logger.Error("RunEvaluationJob failed", "error", err, "job_id", job.Resource.ID)
 			}
 		}()
@@ -114,6 +116,8 @@ func (h *Handlers) HandleCreateEvaluation(ctx *executioncontext.ExecutionContext
 
 // HandleListEvaluations handles GET /api/v1/evaluations/jobs
 func (h *Handlers) HandleListEvaluations(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger)
+
 	logging.LogRequestStarted(ctx)
 
 	limit, err := getParam(r, "limit", true, 50)
@@ -131,24 +135,25 @@ func (h *Handlers) HandleListEvaluations(ctx *executioncontext.ExecutionContext,
 		w.Error(err, ctx.RequestID)
 		return
 	}
-	items, err := h.storage.GetEvaluationJobs(limit, offset, statusFilter)
+	res, err := storage.GetEvaluationJobs(limit, offset, statusFilter)
 	if err != nil {
 		w.Error(err, ctx.RequestID)
 		return
 	}
-	page, err := CreatePage(len(items), offset, limit, ctx, r)
+	page, err := CreatePage(res.TotalStored, offset, limit, ctx, r)
 	if err != nil {
 		w.Error(err, ctx.RequestID)
 		return
 	}
 	w.WriteJSON(api.EvaluationJobResourceList{
 		Page:  *page,
-		Items: items,
+		Items: res.Items,
 	}, 200)
 }
 
 // HandleGetEvaluation handles GET /api/v1/evaluations/jobs/{id}
 func (h *Handlers) HandleGetEvaluation(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger)
 	logging.LogRequestStarted(ctx)
 
 	// Extract ID from path
@@ -158,7 +163,7 @@ func (h *Handlers) HandleGetEvaluation(ctx *executioncontext.ExecutionContext, r
 		return
 	}
 
-	response, err := h.storage.GetEvaluationJob(evaluationJobID)
+	response, err := storage.GetEvaluationJob(evaluationJobID)
 	if err != nil {
 		w.Error(err, ctx.RequestID)
 		return
@@ -168,6 +173,7 @@ func (h *Handlers) HandleGetEvaluation(ctx *executioncontext.ExecutionContext, r
 }
 
 func (h *Handlers) HandleUpdateEvaluation(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger)
 	logging.LogRequestStarted(ctx)
 
 	// Extract ID from path
@@ -190,7 +196,7 @@ func (h *Handlers) HandleUpdateEvaluation(ctx *executioncontext.ExecutionContext
 		return
 	}
 
-	err = h.storage.UpdateEvaluationJobStatus(evaluationJobID, status)
+	err = storage.UpdateEvaluationJobStatus(evaluationJobID, status)
 	if err != nil {
 		w.Error(err, ctx.RequestID)
 		return
@@ -201,6 +207,7 @@ func (h *Handlers) HandleUpdateEvaluation(ctx *executioncontext.ExecutionContext
 
 // HandleCancelEvaluation handles DELETE /api/v1/evaluations/jobs/{id}
 func (h *Handlers) HandleCancelEvaluation(ctx *executioncontext.ExecutionContext, r http_wrappers.RequestWrapper, w http_wrappers.ResponseWrapper) {
+	storage := h.storage.WithLogger(ctx.Logger)
 	logging.LogRequestStarted(ctx)
 
 	// Extract ID from path
@@ -216,7 +223,7 @@ func (h *Handlers) HandleCancelEvaluation(ctx *executioncontext.ExecutionContext
 		return
 	}
 
-	err = h.storage.DeleteEvaluationJob(evaluationJobID, hardDelete)
+	err = storage.DeleteEvaluationJob(evaluationJobID, hardDelete)
 	if err != nil {
 		ctx.Logger.Info("Failed to delete evaluation job", "error", err.Error(), "id", evaluationJobID, "hardDelete", hardDelete)
 		w.Error(err, ctx.RequestID)

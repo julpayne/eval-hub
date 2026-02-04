@@ -13,6 +13,7 @@ import (
 	// import the sqlite driver - "sqlite"
 	_ "modernc.org/sqlite"
 
+	"github.com/eval-hub/eval-hub/internal/abstractions"
 	"github.com/eval-hub/eval-hub/internal/constants"
 	"github.com/eval-hub/eval-hub/internal/messages"
 	"github.com/eval-hub/eval-hub/internal/serviceerrors"
@@ -41,7 +42,7 @@ func (s *SQLStorage) CreateEvaluationJob(evaluation *api.EvaluationJobConfig) (*
 		return nil, err
 	}
 	jobID := s.generateID()
-	s.context.Logger.Info("Creating evaluation job", "id", jobID, "tenant", tenant, "status", api.StatePending)
+	s.logger.Info("Creating evaluation job", "id", jobID, "tenant", tenant, "status", api.StatePending)
 	_, err = s.exec(addEntityStatement, jobID, tenant, api.StatePending, string(evaluationJSON))
 	if err != nil {
 		return nil, err
@@ -90,7 +91,7 @@ func (s *SQLStorage) GetEvaluationJob(id string) (*api.EvaluationJobResource, er
 			return nil, serviceerrors.NewServiceError(messages.ResourceNotFound, "Type", "evaluation job", "ResourceId", id)
 		}
 		// For now we differentiate between no rows found and other errors but this might be confusing
-		s.context.Logger.Error("Failed to get evaluation job", "error", err, "id", id)
+		s.logger.Error("Failed to get evaluation job", "error", err, "id", id)
 		return nil, serviceerrors.NewServiceError(messages.DatabaseOperationFailed, "Type", "evaluation job", "ResourceId", id, "Error", err.Error())
 	}
 
@@ -98,7 +99,7 @@ func (s *SQLStorage) GetEvaluationJob(id string) (*api.EvaluationJobResource, er
 	var evaluationConfig api.EvaluationJobConfig
 	err = json.Unmarshal([]byte(entityJSON), &evaluationConfig)
 	if err != nil {
-		s.context.Logger.Error("Failed to unmarshal evaluation job entity", "error", err, "id", id)
+		s.logger.Error("Failed to unmarshal evaluation job entity", "error", err, "id", id)
 		return nil, serviceerrors.NewServiceError(messages.JSONUnmarshalFailed, "Type", "evaluation job", "Error", err.Error())
 	}
 
@@ -134,7 +135,7 @@ func (s *SQLStorage) GetEvaluationJob(id string) (*api.EvaluationJobResource, er
 	return evaluationResource, nil
 }
 
-func (s *SQLStorage) GetEvaluationJobs(limit int, offset int, statusFilter string) ([]api.EvaluationJobResource, error) {
+func (s *SQLStorage) GetEvaluationJobs(limit int, offset int, statusFilter string) (*abstractions.QueryResults[api.EvaluationJobResource], error) {
 	// Get total count (with status filter if provided)
 	countQuery, countArgs, err := createCountEntitiesStatement(s.sqlConfig.Driver, TABLE_EVALUATIONS, statusFilter)
 	if err != nil {
@@ -148,7 +149,7 @@ func (s *SQLStorage) GetEvaluationJobs(limit int, offset int, statusFilter strin
 		err = s.pool.QueryRowContext(context.Background(), countQuery).Scan(&totalCount)
 	}
 	if err != nil {
-		s.context.Logger.Error("Failed to count evaluation jobs", "error", err)
+		s.logger.Error("Failed to count evaluation jobs", "error", err)
 		return nil, serviceerrors.NewServiceError(messages.QueryFailed, "Type", "evaluation jobs", "Error", err.Error())
 	}
 
@@ -161,7 +162,7 @@ func (s *SQLStorage) GetEvaluationJobs(limit int, offset int, statusFilter strin
 	// Query the database
 	rows, err := s.pool.QueryContext(context.Background(), listQuery, listArgs...)
 	if err != nil {
-		s.context.Logger.Error("Failed to list evaluation jobs", "error", err)
+		s.logger.Error("Failed to list evaluation jobs", "error", err)
 		return nil, serviceerrors.NewServiceError(messages.QueryFailed, "Type", "evaluation jobs", "Error", err.Error())
 	}
 	defer rows.Close()
@@ -176,7 +177,7 @@ func (s *SQLStorage) GetEvaluationJobs(limit int, offset int, statusFilter strin
 
 		err = rows.Scan(&dbID, &createdAt, &updatedAt, &statusStr, &entityJSON)
 		if err != nil {
-			s.context.Logger.Error("Failed to scan evaluation job row", "error", err)
+			s.logger.Error("Failed to scan evaluation job row", "error", err)
 			return nil, serviceerrors.NewServiceError(messages.DatabaseOperationFailed, "Type", "evaluation job", "ResourceId", dbID, "Error", err.Error())
 		}
 
@@ -184,7 +185,7 @@ func (s *SQLStorage) GetEvaluationJobs(limit int, offset int, statusFilter strin
 		var evaluationConfig api.EvaluationJobConfig
 		err = json.Unmarshal([]byte(entityJSON), &evaluationConfig)
 		if err != nil {
-			s.context.Logger.Error("Failed to unmarshal evaluation job entity", "error", err, "id", dbID)
+			s.logger.Error("Failed to unmarshal evaluation job entity", "error", err, "id", dbID)
 			return nil, serviceerrors.NewServiceError(messages.JSONUnmarshalFailed, "Type", "evaluation job", "Error", err.Error())
 		}
 
@@ -220,11 +221,14 @@ func (s *SQLStorage) GetEvaluationJobs(limit int, offset int, statusFilter strin
 	}
 
 	if err = rows.Err(); err != nil {
-		s.context.Logger.Error("Error iterating evaluation job rows", "error", err)
+		s.logger.Error("Error iterating evaluation job rows", "error", err)
 		return nil, serviceerrors.NewServiceError(messages.QueryFailed, "Type", "evaluation jobs", "Error", err.Error())
 	}
 
-	return items, nil
+	return &abstractions.QueryResults[api.EvaluationJobResource]{
+		Items:       items,
+		TotalStored: totalCount,
+	}, nil
 }
 
 func (s *SQLStorage) DeleteEvaluationJob(id string, hardDelete bool) error {
@@ -252,7 +256,7 @@ func (s *SQLStorage) DeleteEvaluationJob(id string, hardDelete bool) error {
 	// Execute the DELETE query
 	_, err = s.exec(deleteQuery, id)
 	if err != nil {
-		s.context.Logger.Error("Failed to delete evaluation job", "error", err, "id", id)
+		s.logger.Error("Failed to delete evaluation job", "error", err, "id", id)
 		return serviceerrors.NewServiceError(messages.DatabaseOperationFailed, "Type", "evaluation job", "ResourceId", id, "Error", err.Error())
 	}
 
@@ -269,7 +273,7 @@ func (s *SQLStorage) DeleteEvaluationJob(id string, hardDelete bool) error {
 	}
 	*/
 
-	s.context.Logger.Info("Deleted evaluation job", "id", id, "hardDelete", hardDelete)
+	s.logger.Info("Deleted evaluation job", "id", id, "hardDelete", hardDelete)
 	return nil
 }
 
@@ -286,7 +290,7 @@ func (s *SQLStorage) UpdateEvaluationJobStatus(id string, status *api.StatusEven
 	statusStr := string(status.StatusEvent.EvaluationJobState.State)
 	_, err = s.exec(updateQuery, statusStr, id)
 	if err != nil {
-		s.context.Logger.Error("Failed to update evaluation job status", "error", err, "id", id, "status", statusStr)
+		s.logger.Error("Failed to update evaluation job status", "error", err, "id", id, "status", statusStr)
 		return serviceerrors.NewServiceError(messages.DatabaseOperationFailed, "Type", "evaluation job", "ResourceId", id, "Error", err.Error())
 	}
 
@@ -303,6 +307,6 @@ func (s *SQLStorage) UpdateEvaluationJobStatus(id string, status *api.StatusEven
 	}
 	*/
 
-	s.context.Logger.Info("Updated evaluation job status", "id", id, "status", statusStr)
+	s.logger.Info("Updated evaluation job status", "id", id, "status", statusStr)
 	return nil
 }

@@ -22,16 +22,10 @@ const (
 	TABLE_COLLECTIONS = "collections"
 )
 
-type SQLStorageContext struct {
-	Tenant api.Tenant
-	Logger slog.Logger
-	URI    string
-}
-
 type SQLStorage struct {
 	sqlConfig *SQLDatabaseConfig
 	pool      *sql.DB
-	context   *SQLStorageContext
+	logger    *slog.Logger
 }
 
 func NewStorage(config map[string]any, logger *slog.Logger) (abstractions.Storage, error) {
@@ -71,6 +65,7 @@ func NewStorage(config map[string]any, logger *slog.Logger) (abstractions.Storag
 	s := &SQLStorage{
 		sqlConfig: &sqlConfig,
 		pool:      pool,
+		logger:    logger,
 	}
 
 	// ping the database to verify the DSN provided by the user is valid and the server is accessible
@@ -128,4 +123,10 @@ func (s *SQLStorage) generateID() string {
 
 func (s *SQLStorage) Close() error {
 	return s.pool.Close()
+}
+
+func (s *SQLStorage) WithLogger(logger *slog.Logger) abstractions.Storage {
+	newStorage := s
+	newStorage.logger = logger
+	return newStorage
 }

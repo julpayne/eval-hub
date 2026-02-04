@@ -69,7 +69,7 @@ func TestStorage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create storage: %v", err)
 		}
-		store = s
+		store = s.WithLogger(logger)
 	})
 
 	t.Run("CreateEvaluationJob creates a new evaluation job", func(t *testing.T) {
@@ -105,7 +105,7 @@ func TestStorage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to get evaluation jobs: %v", err)
 		}
-		if len(resp) == 0 {
+		if len(resp.Items) == 0 {
 			t.Fatalf("No evaluation jobs found")
 		}
 	})

@@ -29,7 +29,7 @@ func (f *fakeStorage) CreateEvaluationJob(_ *api.EvaluationJobConfig) (*api.Eval
 func (f *fakeStorage) GetEvaluationJob(_ string) (*api.EvaluationJobResource, error) {
 	return nil, nil
 }
-func (f *fakeStorage) GetEvaluationJobs(int, _ int, _ string) ([]api.EvaluationJobResource, error) {
+func (f *fakeStorage) GetEvaluationJobs(int, _ int, _ string) (*abstractions.QueryResults[api.EvaluationJobResource], error) {
 	return nil, nil
 }
 func (f *fakeStorage) DeleteEvaluationJob(_ string, _ bool) error {
@@ -45,7 +45,7 @@ func (f *fakeStorage) CreateCollection(_ *api.CollectionResource) error {
 func (f *fakeStorage) GetCollection(_ string, _ bool) (*api.CollectionResource, error) {
 	return nil, nil
 }
-func (f *fakeStorage) GetCollections(_ int, _ int) ([]api.CollectionResource, error) {
+func (f *fakeStorage) GetCollections(_ int, _ int) (*abstractions.QueryResults[api.CollectionResource], error) {
 	return nil, nil
 }
 func (f *fakeStorage) UpdateCollection(_ *api.CollectionResource) error {
@@ -56,6 +56,9 @@ func (f *fakeStorage) DeleteCollection(_ string) error {
 }
 func (f *fakeStorage) Close() error { return nil }
 
+func (f *fakeStorage) WithLogger(_ *slog.Logger) abstractions.Storage {
+	return f
+}
 func TestPersistJobFailureNoStorage(t *testing.T) {
 	runtime := &K8sRuntime{}
 	runtime.persistJobFailure(nil, nil, context.Canceled)
