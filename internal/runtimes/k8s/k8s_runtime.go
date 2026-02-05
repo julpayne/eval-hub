@@ -83,14 +83,7 @@ func (r *K8sRuntime) RunEvaluationJob(evaluation *api.EvaluationJobResource, sto
 					)
 
 					if storage != nil && *storage != nil {
-						runStatus := &api.RunStatusInternal{
-							StatusEvent: api.RunStatusEvent{
-								ProviderID:   bench.ProviderID,
-								BenchmarkID:  bench.ID,
-								Status:       api.StateFailed,
-								ErrorMessage: &api.MessageInfo{Message: err.Error(), MessageCode: constants.MESSAGE_CODE_EVALUATION_JOB_FAILED},
-							},
-						}
+						runStatus := buildBenchmarkFailureStatus(&bench, err)
 						if updateErr := (*storage).UpdateEvaluationJob(evaluation.Resource.ID, runStatus); updateErr != nil {
 							r.logger.Error(
 								"failed to update benchmark status",
@@ -158,6 +151,17 @@ func (r *K8sRuntime) createBenchmarkResources(ctx context.Context, logger *slog.
 		logger.Error("failed to set configmap owner reference", "namespace", configMap.Namespace, "name", configMap.Name, "error", err)
 	}
 	return nil
+}
+
+func buildBenchmarkFailureStatus(benchmark *api.BenchmarkConfig, runErr error) *api.RunStatusInternal {
+	return &api.RunStatusInternal{
+		StatusEvent: api.RunStatusEvent{
+			ProviderID:   benchmark.ProviderID,
+			BenchmarkID:  benchmark.ID,
+			Status:       api.StateFailed,
+			ErrorMessage: &api.MessageInfo{Message: runErr.Error(), MessageCode: constants.MESSAGE_CODE_EVALUATION_JOB_FAILED},
+		},
+	}
 }
 
 func (r *K8sRuntime) Name() string {
